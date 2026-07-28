@@ -1,12 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { SignJWT, importPKCS8 } from "jose";
+import { GoogleAuth } from "google-auth-library";
 import type { Review } from "./types";
 
 const PACKAGE_NAME = "vn.mytvnet.mobileb2c";
 const PLAY_SCOPE = "https://www.googleapis.com/auth/androidpublisher";
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVIEWS_URL =
   "https://androidpublisher.googleapis.com/androidpublisher/v3/applications";
 export const RECENT_WINDOW_DAYS = 7;
@@ -37,35 +35,16 @@ function loadServiceAccount(): ServiceAccount {
 }
 
 async function getAccessToken(credentials: ServiceAccount): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const key = await importPKCS8(credentials.private_key, "RS256");
-  const assertion = await new SignJWT({
-    scope: PLAY_SCOPE,
-  })
-    .setProtectedHeader({ alg: "RS256" })
-    .setIssuer(credentials.client_email)
-    .setAudience(TOKEN_URL)
-    .setIssuedAt(now)
-    .setExpirationTime(now + 55 * 60)
-    .sign(key);
-
-  const body = new URLSearchParams({
-    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    assertion,
+  const auth = new GoogleAuth({
+    credentials,
+    scopes: [PLAY_SCOPE],
   });
-
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-  });
-
-  if (!response.ok) {
-    throw new Error(`OAuth token error ${response.status}: ${await response.text()}`);
+  const client = await auth.getClient();
+  const accessToken = await client.getAccessToken();
+  if (!accessToken.token) {
+    throw new Error("Không lấy được access token cho Google Play API");
   }
-
-  const json = (await response.json()) as { access_token: string };
-  return json.access_token;
+  return accessToken.token;
 }
 
 function mapApiReview(api: Record<string, unknown>): Review | null {
@@ -132,7 +111,6 @@ export async function fetchRecentReviews(): Promise<Review[]> {
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "x-request-id": randomUUID(),
       },
     });
 

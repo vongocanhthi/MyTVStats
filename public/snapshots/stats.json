@@ -1,0 +1,145 @@
+{
+  "dataScope": "recent_only",
+  "csvReviewCount": 0,
+  "apiReviewCount": 0,
+  "totalReviews": 0,
+  "averageRating": 0,
+  "ratingDistribution": [
+    { "stars": 1, "count": 0, "percentage": 0 },
+    { "stars": 2, "count": 0, "percentage": 0 },
+    { "stars": 3, "count": 0, "percentage": 0 },
+    { "stars": 4, "count": 0, "percentage": 0 },
+    { "stars": 5, "count": 0, "percentage": 0 }
+  ],
+  "reviewsLast7Days": 0,
+  "replyRate": 0,
+  "today": {
+    "reviewCount": 0,
+    "averageRating": 0,
+    "replyRate": 0,
+    "ratingDistribution": [
+      { "stars": 1, "count": 0, "percentage": 0 },
+      { "stars": 2, "count": 0, "percentage": 0 },
+      { "stars": 3, "count": 0, "percentage": 0 },
+      { "stars": 4, "count": 0, "percentage": 0 },
+      { "stars": 5, "count": 0, "percentage": 0 }
+    ]
+  },
+  "last7Days": {
+    "reviewCount": 0,
+    "averageRating": 0,
+    "replyRate": 0,
+    "ratingDistribution": [
+      { "stars": 1, "count": 0, "percentage": 0 },
+      { "stars": 2, "count": 0, "percentage": 0 },
+      { "stars": 3, "count": 0, "percentage": 0 },
+      { "stars": 4, "count": 0, "percentage": 0 },
+      { "stars": 5, "count": 0, "percentage": 0 }
+    ]
+  },
+  "dailyTrend": [
+    { "day": "2026-07-22", "count": 0, "averageRating": 0 },
+    { "day": "2026-07-23", "count": 0, "averageRating": 0 },
+    { "day": "2026-07-24", "count": 0, "averageRating": 0 },
+    { "day": "2026-07-25", "count": 0, "averageRating": 0 },
+    { "day": "2026-07-26", "count": 0, "averageRating": 0 },
+    { "day": "2026-07-27", "count": 0, "averageRating": 0 },
+    { "day": "2026-07-28", "count": 0, "averageRating": 0 }
+  ],
+  "dailyBreakdown": [
+    {
+      "day": "2026-07-22",
+      "reviewCount": 0,
+      "averageRating": 0,
+      "replyRate": 0,
+      "ratingDistribution": [
+        { "stars": 1, "count": 0, "percentage": 0 },
+        { "stars": 2, "count": 0, "percentage": 0 },
+        { "stars": 3, "count": 0, "percentage": 0 },
+        { "stars": 4, "count": 0, "percentage": 0 },
+        { "stars": 5, "count": 0, "percentage": 0 }
+      ]
+    },
+    {
+      "day": "2026-07-23",
+      "reviewCount": 0,
+      "averageRating": 0,
+      "replyRate": 0,
+      "ratingDistribution": [
+        { "stars": 1, "count": 0, "percentage": 0 },
+        { "stars": 2, "count": 0, "percentage": 0 },
+        { "stars": 3, "count": 0, "percentage": 0 },
+        { "stars": 4, "count": 0, "percentage": 0 },
+        { "stars": 5, "count": 0, "percentage": 0 }
+      ]
+    },
+    {
+      "day": "2026-07-24",
+      "reviewCount": 0,
+      "averageRating": 0,
+      "replyRate": 0,
+      "ratingDistribution": [
+        { "stars": 1, "count": 0, "percentage": 0 },
+        { "stars": 2, "count": 0, "percentage": 0 },
+        { "stars": 3, "count": 0, "percentage": 0 },
+        { "stars": 4, "count": 0, "percentage": 0 },
+        { "stars": 5, "count": 0, "percentage": 0 }
+      ]
+    },
+    {
+      "day": "2026-07-25",
+      "reviewCount": 0,
+      "averageRating": 0,
+      "replyRate": 0,
+      "ratingDistribution": [
+        { "stars": 1, "count": 0, "percentage": 0 },
+        { "stars": 2, "count": 0, "percentage": 0 },
+        { "stars": 3, "count": 0, "percentage": 0 },
+        { "stars": 4, "count": 0, "percentage": 0 },
+        { "stars": 5, "count": 0, "percentage": 0 }
+      ]
+    },
+    {
+      "day": "2026-07-26",
+      "reviewCount": 0,
+      "averageRating": 0,
+      "replyRate": 0,
+      "ratingDistribution": [
+        { "stars": 1, "count": 0, "percentage": 0 },
+        { "stars": 2, "count": 0, "percentage": 0 },
+        { "stars": 3, "count": 0, "percentage": 0 },
+        { "stars": 4, "count": 0, "percentage": 0 },
+        { "stars": 5, "count": 0, "percentage": 0 }
+      ]
+    },
+    {
+      "day": "2026-07-27",
+      "reviewCount": 0,
+      "averageRating": 0,
+      "replyRate": 0,
+      "ratingDistribution": [
+        { "stars": 1, "count": 0, "percentage": 0 },
+        { "stars": 2, "count": 0, "percentage": 0 },
+        { "stars": 3, "count": 0, "percentage": 0 },
+        { "stars": 4, "count": 0, "percentage": 0 },
+        { "stars": 5, "count": 0, "percentage": 0 }
+      ]
+    },
+    {
+      "day": "2026-07-28",
+      "reviewCount": 0,
+      "averageRating": 0,
+      "replyRate": 0,
+      "ratingDistribution": [
+        { "stars": 1, "count": 0, "percentage": 0 },
+        { "stars": 2, "count": 0, "percentage": 0 },
+        { "stars": 3, "count": 0, "percentage": 0 },
+        { "stars": 4, "count": 0, "percentage": 0 },
+        { "stars": 5, "count": 0, "percentage": 0 }
+      ]
+    }
+  ],
+  "monthlyTrend": [],
+  "topVersions": [],
+  "lastSyncAt": 1785223860
+}

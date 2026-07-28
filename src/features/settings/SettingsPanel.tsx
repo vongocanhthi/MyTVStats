@@ -32,13 +32,13 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
   async function handleRefresh() {
     setIsRefreshing(true);
     setMessageKind("info");
-    setMessage("Đang lấy reviews 7 ngày từ Google Play API...");
+    setMessage("Đang tải lại snapshot public...");
     try {
       await queryClient.invalidateQueries({ queryKey: ["stats"] });
       await queryClient.invalidateQueries({ queryKey: ["reviews"] });
       await queryClient.fetchQuery({ queryKey: ["stats"], queryFn: getStats });
       setMessageKind("success");
-      setMessage("Đã làm mới dữ liệu từ Play API.");
+      setMessage("Đã tải lại snapshot.");
     } catch (error) {
       setMessageKind("error");
       setMessage(error instanceof Error ? error.message : String(error));
@@ -64,9 +64,9 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
     <div className="space-y-6">
       {!inTauri ? (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
-          <p className="font-medium text-amber-50">Chế độ web — không lưu database</p>
+          <p className="font-medium text-amber-50">Chế độ web public — GitHub Pages static</p>
           <p className="mt-1">
-            Mỗi lần xem hoặc bấm Làm mới, app gọi trực tiếp Google Play API (7 ngày gần nhất).
+            Site đọc snapshot JSON public đã build sẵn, không gọi Google Play API trực tiếp trên client.
           </p>
         </div>
       ) : null}
@@ -86,10 +86,10 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-medium text-white">Google Play API</h2>
+          <h2 className="text-lg font-medium text-white">Snapshot dữ liệu</h2>
           <p className="mt-2 text-sm text-slate-400">
-            Service Account đã cấu hình sẵn. Không lưu reviews cục bộ — thống kê luôn lấy realtime
-            trong cửa sổ <strong className="text-slate-200">7 ngày</strong>.
+            Web public dùng snapshot reviews trong cửa sổ <strong className="text-slate-200">7 ngày</strong>.
+            Snapshot được sinh trước khi deploy và phát hành qua GitHub Pages.
           </p>
 
           <div className="mt-5 space-y-3">
@@ -99,7 +99,7 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
                 {settingsQuery.data?.packageName ?? PACKAGE_NAME}
               </p>
               <p className="mt-1">
-                <span className="text-slate-300">Lần lấy dữ liệu gần nhất:</span>{" "}
+                <span className="text-slate-300">Snapshot cập nhật lúc:</span>{" "}
                 {formatDate(statsQuery.data?.lastSyncAt)}
               </p>
               <p className="mt-1">
@@ -116,7 +116,7 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
               className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:opacity-50"
             >
               <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
-              {isRefreshing ? "Đang làm mới..." : "Làm mới dữ liệu"}
+              {isRefreshing ? "Đang tải lại..." : "Tải lại snapshot"}
             </button>
           </div>
         </section>

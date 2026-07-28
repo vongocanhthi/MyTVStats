@@ -6,8 +6,11 @@ import tailwindcss from "@tailwindcss/vite";
 const host = process.env.TAURI_DEV_HOST;
 // @ts-expect-error process is a nodejs global
 const webPort = process.env.MYTVSTATS_WEB_PORT ? Number(process.env.MYTVSTATS_WEB_PORT) : 3001;
+// @ts-expect-error process is a nodejs global
+const basePath = process.env.VITE_BASE_PATH || "/";
 
 export default defineConfig(async () => ({
+  base: basePath,
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   server: {

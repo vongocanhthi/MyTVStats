@@ -139,7 +139,7 @@ export function ReportPanel() {
   if (isLoading && !data) {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-slate-300">
-        Đang tải dữ liệu báo cáo...
+        Đang tải snapshot báo cáo...
       </div>
     );
   }
@@ -161,7 +161,7 @@ export function ReportPanel() {
     return (
       <div className="space-y-4">
         <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-10 text-center text-slate-400">
-          Chưa có dữ liệu thống kê. Hãy Sync trên Dashboard rồi bấm Làm mới data.
+          Chưa có dữ liệu snapshot. Hãy chạy workflow refresh snapshot rồi deploy lại GitHub Pages.
         </div>
         <div className="flex justify-center">
           <button
@@ -173,7 +173,7 @@ export function ReportPanel() {
             className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:opacity-50"
           >
             <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
-            Làm mới data
+            Tải lại snapshot
           </button>
         </div>
       </div>
@@ -190,7 +190,7 @@ export function ReportPanel() {
               Báo cáo theo ngày
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Chọn ngày trong 7 ngày gần nhất (giờ VN). Báo cáo gồm thống kê + chi tiết từng review.
+              Chọn ngày trong snapshot 7 ngày gần nhất (giờ VN). Báo cáo gồm thống kê + chi tiết từng review.
             </p>
           </div>
           <button
@@ -202,7 +202,7 @@ export function ReportPanel() {
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
           >
             <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
-            Làm mới data
+            Tải lại snapshot
           </button>
         </div>
 

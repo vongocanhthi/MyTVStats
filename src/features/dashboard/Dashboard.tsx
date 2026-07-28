@@ -24,11 +24,10 @@ export function Dashboard() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["stats"],
     queryFn: getStats,
-    refetchInterval: 60_000,
   });
 
   async function handleSync() {
-    setSyncMessage("Đang sync reviews 7 ngày từ Play API...");
+    setSyncMessage("Đang tải lại snapshot public...");
     try {
       await queryClient.invalidateQueries({ queryKey: ["reviews"] });
       const result = await refetch();
@@ -39,7 +38,7 @@ export function Dashboard() {
         return;
       }
       setLastSyncedAtMs(Date.now());
-      setSyncMessage("Đã sync xong.");
+      setSyncMessage("Đã tải lại snapshot.");
     } catch (syncError) {
       setSyncMessage(
         syncError instanceof Error ? syncError.message : String(syncError),
@@ -62,7 +61,7 @@ export function Dashboard() {
         )}
       >
         <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
-        {isFetching ? "Đang sync..." : "Sync ngay"}
+        {isFetching ? "Đang tải lại..." : "Tải lại snapshot"}
       </button>
     );
   }
@@ -74,9 +73,9 @@ export function Dashboard() {
   const toolbar = (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
       <div className="min-w-0 text-sm text-slate-300">
-        <p className="font-medium text-white">Dữ liệu realtime 7 ngày</p>
+        <p className="font-medium text-white">Snapshot public 7 ngày</p>
         <p className="mt-0.5 text-slate-400">
-          Lần lấy gần nhất: {lastFetchedLabel}
+          Cập nhật lúc: {lastFetchedLabel}
           {syncMessage ? ` · ${syncMessage}` : ""}
         </p>
       </div>
@@ -111,15 +110,15 @@ export function Dashboard() {
       <div className="space-y-4">
         {toolbar}
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
-          <p className="font-medium">Realtime 7-day snapshot</p>
+          <p className="font-medium">Snapshot public 7 ngày</p>
           <p className="mt-1">
-            Bấm <strong>Sync ngay</strong> để lấy reviews 7 ngày từ Play API.
+            Chưa có dữ liệu snapshot. Hãy chạy workflow refresh snapshot rồi deploy lại Pages.
           </p>
         </div>
         <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-10 text-center">
           <h2 className="text-xl font-semibold text-white">Chưa có dữ liệu review</h2>
           <p className="mt-3 text-slate-400">
-            Kiểm tra Service Account / quyền Play API, rồi bấm Sync ngay.
+            Kiểm tra workflow snapshot hoặc service account trong GitHub Secrets.
           </p>
           <div className="mt-5 flex justify-center">
             <SyncButton />

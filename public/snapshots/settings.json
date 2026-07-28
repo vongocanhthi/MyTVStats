@@ -1,0 +1,4 @@
+{
+  "serviceAccountPath": "github-actions-secret",
+  "packageName": "vn.mytvnet.mobileb2c"
+}

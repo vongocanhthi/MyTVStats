@@ -28,4 +28,5 @@ for _ in $(seq 1 60); do
 done
 
 echo "Starting Vite frontend on http://localhost:1420 (proxy /api -> :${WEB_PORT})"
+export VITE_API_BASE_URL="/api"
 npm run dev
