@@ -53,6 +53,10 @@ export interface PeriodStats {
 
 export type DataScope = "recent_only";
 
+export interface DailyPeriodStats extends PeriodStats {
+  day: string;
+}
+
 export interface StatsOverview {
   dataScope: DataScope;
   csvReviewCount: number;
@@ -65,6 +69,7 @@ export interface StatsOverview {
   today: PeriodStats;
   last7Days: PeriodStats;
   dailyTrend: DailyTrendPoint[];
+  dailyBreakdown: DailyPeriodStats[];
   monthlyTrend: MonthlyTrendPoint[];
   topVersions: VersionStats[];
   lastSyncAt?: number | null;
@@ -96,4 +101,4 @@ export interface AppSettings {
   packageName: string;
 }
 
-export type TabId = "dashboard" | "reviews" | "settings";
+export type TabId = "dashboard" | "reviews" | "report" | "settings";

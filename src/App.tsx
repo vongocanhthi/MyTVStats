@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Layout } from "./components/Layout";
 import { LoginDialog } from "./features/auth/LoginDialog";
 import { Dashboard } from "./features/dashboard/Dashboard";
+import { ReportPanel } from "./features/report/ReportPanel";
 import { ReviewsTable } from "./features/reviews/ReviewsTable";
 import { SettingsPanel } from "./features/settings/SettingsPanel";
 import { isAuthenticated } from "./lib/auth";
@@ -29,6 +30,7 @@ function AppContent() {
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === "dashboard" ? <Dashboard /> : null}
       {activeTab === "reviews" ? <ReviewsTable /> : null}
+      {activeTab === "report" ? <ReportPanel /> : null}
       {activeTab === "settings" ? (
         <SettingsPanel onLogout={() => setAuthed(false)} />
       ) : null}

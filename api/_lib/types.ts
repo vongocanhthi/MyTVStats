@@ -34,6 +34,10 @@ export interface PeriodStats {
   ratingDistribution: RatingBucket[];
 }
 
+export interface DailyPeriodStats extends PeriodStats {
+  day: string;
+}
+
 export interface DailyTrendPoint {
   day: string;
   count: number;
@@ -58,6 +62,7 @@ export interface StatsOverview {
   today: PeriodStats;
   last7Days: PeriodStats;
   dailyTrend: DailyTrendPoint[];
+  dailyBreakdown: DailyPeriodStats[];
   monthlyTrend: [];
   topVersions: VersionStats[];
   lastSyncAt: number;

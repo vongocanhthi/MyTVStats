@@ -41,6 +41,16 @@ pub struct PeriodStats {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DailyPeriodStats {
+    pub day: String,
+    pub review_count: i64,
+    pub average_rating: f64,
+    pub reply_rate: f64,
+    pub rating_distribution: Vec<RatingBucket>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StatsOverview {
     /// Always `recent_only` — app chỉ dùng Play API 7 ngày.
     pub data_scope: String,
@@ -56,6 +66,8 @@ pub struct StatsOverview {
     /// Thống kê 7 ngày gần nhất.
     pub last_7_days: PeriodStats,
     pub daily_trend: Vec<DailyTrendPoint>,
+    /// PeriodStats đầy đủ theo từng ngày (giờ VN) trong cửa sổ 7 ngày.
+    pub daily_breakdown: Vec<DailyPeriodStats>,
     pub monthly_trend: Vec<MonthlyTrendPoint>,
     pub top_versions: Vec<VersionStats>,
     pub last_sync_at: Option<i64>,

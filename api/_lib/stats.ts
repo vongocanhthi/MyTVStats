@@ -1,5 +1,6 @@
 import { RECENT_WINDOW_DAYS } from "./play";
 import type {
+  DailyPeriodStats,
   DailyTrendPoint,
   PeriodStats,
   RatingBucket,
@@ -10,8 +11,17 @@ import type {
   VersionStats,
 } from "./types";
 
-function utcDayKey(timestamp: number): string {
-  return new Date(timestamp * 1000).toISOString().slice(0, 10);
+function dayKeyVn(timestamp: number): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(timestamp * 1000));
+}
+
+function todayKeyVn(): string {
+  return dayKeyVn(Math.floor(Date.now() / 1000));
 }
 
 function todayStartUtc(): number {
@@ -56,30 +66,37 @@ function periodStats(reviews: Review[]): PeriodStats {
   };
 }
 
-function dailyTrend(reviews: Review[]): DailyTrendPoint[] {
-  const byDay = new Map<string, { count: number; sum: number }>();
+function dailyBreakdown(reviews: Review[]): DailyPeriodStats[] {
+  const byDay = new Map<string, Review[]>();
   for (const review of reviews) {
-    const key = utcDayKey(review.lastModifiedAt);
-    const entry = byDay.get(key) ?? { count: 0, sum: 0 };
-    entry.count += 1;
-    entry.sum += review.starRating;
-    byDay.set(key, entry);
+    const key = dayKeyVn(review.lastModifiedAt);
+    const list = byDay.get(key) ?? [];
+    list.push(review);
+    byDay.set(key, list);
   }
 
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  const filled: DailyTrendPoint[] = [];
+  const todayKey = todayKeyVn();
+  const todayDate = new Date(`${todayKey}T00:00:00+07:00`);
+  const filled: DailyPeriodStats[] = [];
   for (let i = RECENT_WINDOW_DAYS - 1; i >= 0; i -= 1) {
-    const dayMs = todayUtc - i * 24 * 60 * 60 * 1000;
-    const key = new Date(dayMs).toISOString().slice(0, 10);
-    const entry = byDay.get(key);
+    const dayDate = new Date(todayDate.getTime() - i * 24 * 60 * 60 * 1000);
+    const key = dayKeyVn(Math.floor(dayDate.getTime() / 1000));
+    const dayReviews = byDay.get(key) ?? [];
+    const stats = periodStats(dayReviews);
     filled.push({
       day: key,
-      count: entry?.count ?? 0,
-      averageRating: entry && entry.count > 0 ? entry.sum / entry.count : 0,
+      ...stats,
     });
   }
   return filled;
+}
+
+function dailyTrend(breakdown: DailyPeriodStats[]): DailyTrendPoint[] {
+  return breakdown.map((day) => ({
+    day: day.day,
+    count: day.reviewCount,
+    averageRating: day.averageRating,
+  }));
 }
 
 function topVersions(reviews: Review[]): VersionStats[] {
@@ -109,6 +126,7 @@ export function buildStats(reviews: Review[]): StatsOverview {
   const todayStart = todayStartUtc();
   const todayReviews = inWindow.filter((r) => r.lastModifiedAt >= todayStart);
   const last7Days = periodStats(inWindow);
+  const breakdown = dailyBreakdown(inWindow);
 
   return {
     dataScope: "recent_only",
@@ -121,7 +139,8 @@ export function buildStats(reviews: Review[]): StatsOverview {
     replyRate: last7Days.replyRate,
     today: periodStats(todayReviews),
     last7Days,
-    dailyTrend: dailyTrend(inWindow),
+    dailyTrend: dailyTrend(breakdown),
+    dailyBreakdown: breakdown,
     monthlyTrend: [],
     topVersions: topVersions(inWindow),
     lastSyncAt: Math.floor(Date.now() / 1000),

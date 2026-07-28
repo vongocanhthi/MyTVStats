@@ -40,13 +40,18 @@ export function PeriodStatsTable({ title, subtitle, stats }: PeriodStatsTablePro
                 {formatPercent(stats.replyRate)}
               </td>
             </tr>
-            {stats.ratingDistribution.map((bucket) => (
+            <tr className="border-t border-white/10">
+              <td colSpan={2} className="px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Phân bố sao
+              </td>
+            </tr>
+            {(stats.ratingDistribution ?? []).map((bucket) => (
               <tr key={bucket.stars} className="border-t border-white/5">
                 <td className="px-3 py-3">{bucket.stars}★</td>
                 <td className="px-3 py-3">
                   {formatNumber(bucket.count)}
                   <span className="ml-2 text-slate-400">
-                    ({bucket.percentage.toFixed(1)}%)
+                    ({Number(bucket.percentage ?? 0).toFixed(1)}%)
                   </span>
                 </td>
               </tr>

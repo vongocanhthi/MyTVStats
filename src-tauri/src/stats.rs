@@ -1,11 +1,23 @@
 use crate::models::{
-    DailyTrendPoint, PeriodStats, RatingBucket, Review, ReviewFilters, ReviewsPage, StatsOverview,
-    VersionStats, PACKAGE_NAME, RECENT_WINDOW_DAYS,
+    DailyPeriodStats, DailyTrendPoint, PeriodStats, RatingBucket, Review, ReviewFilters,
+    ReviewsPage, StatsOverview, VersionStats, PACKAGE_NAME, RECENT_WINDOW_DAYS,
 };
-use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{Duration, FixedOffset, NaiveDate, NaiveTime, TimeZone, Utc};
 use std::collections::HashMap;
 
 const RECENT_ONLY_SCOPE: &str = "recent_only";
+
+fn vietnam_tz() -> FixedOffset {
+    FixedOffset::east_opt(7 * 3600).expect("valid VN offset")
+}
+
+fn day_key_vn(timestamp: i64) -> String {
+    vietnam_tz()
+        .timestamp_opt(timestamp, 0)
+        .single()
+        .map(|dt| dt.format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|| "unknown".into())
+}
 
 pub fn build_stats(reviews: &[Review]) -> StatsOverview {
     let window_start = (Utc::now() - Duration::days(RECENT_WINDOW_DAYS)).timestamp();
@@ -31,6 +43,7 @@ pub fn build_stats(reviews: &[Review]) -> StatsOverview {
     );
     let last_7_days = period_stats(&in_window);
     let daily_trend = daily_trend(&in_window);
+    let daily_breakdown = daily_breakdown(&in_window);
     let top_versions = top_versions(&in_window);
 
     StatsOverview {
@@ -45,6 +58,7 @@ pub fn build_stats(reviews: &[Review]) -> StatsOverview {
         today,
         last_7_days,
         daily_trend,
+        daily_breakdown,
         monthly_trend: Vec::new(),
         top_versions,
         last_sync_at: Some(Utc::now().timestamp()),
@@ -181,38 +195,45 @@ fn period_stats(reviews: &[&Review]) -> PeriodStats {
     }
 }
 
-fn daily_trend(reviews: &[&Review]) -> Vec<DailyTrendPoint> {
-    let mut by_day: HashMap<String, (i64, i64)> = HashMap::new();
+fn to_daily_period_stats(day: String, stats: PeriodStats) -> DailyPeriodStats {
+    DailyPeriodStats {
+        day,
+        review_count: stats.review_count,
+        average_rating: stats.average_rating,
+        reply_rate: stats.reply_rate,
+        rating_distribution: stats.rating_distribution,
+    }
+}
+
+fn daily_breakdown(reviews: &[&Review]) -> Vec<DailyPeriodStats> {
+    let mut by_day: HashMap<String, Vec<&Review>> = HashMap::new();
     for review in reviews {
-        let day = Utc
-            .timestamp_opt(review.last_modified_at, 0)
-            .single()
-            .map(|dt| dt.format("%Y-%m-%d").to_string())
-            .unwrap_or_else(|| "unknown".into());
-        let entry = by_day.entry(day).or_insert((0, 0));
-        entry.0 += 1;
-        entry.1 += i64::from(review.star_rating);
+        let key = day_key_vn(review.last_modified_at);
+        by_day.entry(key).or_default().push(*review);
     }
 
-    let today = Utc::now().date_naive();
-    let start_day = today - Duration::days(RECENT_WINDOW_DAYS - 1);
+    let today_vn = Utc::now().with_timezone(&vietnam_tz()).date_naive();
+    let start_day = today_vn - Duration::days(RECENT_WINDOW_DAYS - 1);
     let mut filled = Vec::with_capacity(RECENT_WINDOW_DAYS as usize);
     let mut cursor: NaiveDate = start_day;
-    while cursor <= today {
+    while cursor <= today_vn {
         let key = cursor.format("%Y-%m-%d").to_string();
-        let (count, sum) = by_day.remove(&key).unwrap_or((0, 0));
-        filled.push(DailyTrendPoint {
-            day: key,
-            count,
-            average_rating: if count > 0 {
-                sum as f64 / count as f64
-            } else {
-                0.0
-            },
-        });
+        let day_reviews = by_day.remove(&key).unwrap_or_default();
+        filled.push(to_daily_period_stats(key, period_stats(&day_reviews)));
         cursor += Duration::days(1);
     }
     filled
+}
+
+fn daily_trend(reviews: &[&Review]) -> Vec<DailyTrendPoint> {
+    daily_breakdown(reviews)
+        .into_iter()
+        .map(|day| DailyTrendPoint {
+            day: day.day,
+            count: day.review_count,
+            average_rating: day.average_rating,
+        })
+        .collect()
 }
 
 fn top_versions(reviews: &[&Review]) -> Vec<VersionStats> {
