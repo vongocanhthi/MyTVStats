@@ -2,6 +2,7 @@ mod commands;
 mod error;
 mod models;
 mod play_api;
+mod settings_store;
 mod stats;
 mod web_server;
 
@@ -15,6 +16,7 @@ pub fn run() {
             commands::get_stats,
             commands::list_reviews,
             commands::get_settings,
+            commands::set_service_account_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

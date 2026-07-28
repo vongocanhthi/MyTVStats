@@ -1,3 +1,13 @@
+import { fetchRecentReviews } from "./play-client";
+import {
+  clearCustomServiceAccount,
+  getServiceAccountLabel,
+  loadCustomServiceAccount,
+  parseServiceAccountJson,
+  saveCustomServiceAccount,
+  type ServiceAccountCredentials,
+} from "./service-account-store";
+import { buildStats, listReviewsFromData } from "./stats-builder";
 import type {
   AppSettings,
   Review,
@@ -34,6 +44,8 @@ async function expectJson<T>(res: Response): Promise<T> {
 let statsSnapshotPromise: Promise<StatsOverview> | null = null;
 let reviewsSnapshotPromise: Promise<Review[]> | null = null;
 let settingsSnapshotPromise: Promise<AppSettings> | null = null;
+let liveReviewsCache: Review[] | null = null;
+let liveReviewsPromise: Promise<Review[]> | null = null;
 
 async function fetchSnapshot<T>(filename: string): Promise<T> {
   const res = await fetch(snapshotUrl(filename), { cache: "no-store" });
@@ -53,6 +65,42 @@ function getReviewsSnapshot(): Promise<Review[]> {
 function getSettingsSnapshot(): Promise<AppSettings> {
   settingsSnapshotPromise ??= fetchSnapshot<AppSettings>("settings.json");
   return settingsSnapshotPromise;
+}
+
+function hasCustomServiceAccount(): boolean {
+  return loadCustomServiceAccount() != null;
+}
+
+async function getLiveReviews(force = false): Promise<Review[]> {
+  const credentials = loadCustomServiceAccount();
+  if (!credentials) {
+    throw new Error("Chưa cấu hình Service Account custom.");
+  }
+  if (!force && liveReviewsCache) {
+    return liveReviewsCache;
+  }
+  if (!force && liveReviewsPromise) {
+    return liveReviewsPromise;
+  }
+
+  liveReviewsPromise = fetchRecentReviews(credentials)
+    .then((reviews) => {
+      liveReviewsCache = reviews;
+      return reviews;
+    })
+    .finally(() => {
+      liveReviewsPromise = null;
+    });
+
+  return liveReviewsPromise;
+}
+
+export function invalidateDataCache(): void {
+  statsSnapshotPromise = null;
+  reviewsSnapshotPromise = null;
+  settingsSnapshotPromise = null;
+  liveReviewsCache = null;
+  liveReviewsPromise = null;
 }
 
 function normalizeSortOrder(sortOrder?: SortOrder): SortOrder {
@@ -105,6 +153,10 @@ export async function getStats(): Promise<StatsOverview> {
     const res = await fetch(withApiBase("/api/stats"));
     return expectJson<StatsOverview>(res);
   }
+  if (hasCustomServiceAccount()) {
+    const reviews = await getLiveReviews();
+    return buildStats(reviews);
+  }
   return getStatsSnapshot();
 }
 
@@ -125,6 +177,11 @@ export async function listReviews(filters: ReviewFilters): Promise<ReviewsPage> 
     return expectJson<ReviewsPage>(res);
   }
 
+  if (hasCustomServiceAccount()) {
+    const reviews = await getLiveReviews();
+    return listReviewsFromData(reviews, filters);
+  }
+
   const reviews = await getReviewsSnapshot();
   return filterAndPaginateReviews(reviews, filters);
 }
@@ -134,5 +191,32 @@ export async function getSettings(): Promise<AppSettings> {
     const res = await fetch(withApiBase("/api/settings"));
     return expectJson<AppSettings>(res);
   }
-  return getSettingsSnapshot();
+
+  const snapshot = await getSettingsSnapshot();
+  return {
+    ...snapshot,
+    serviceAccountPath: getServiceAccountLabel(),
+  };
+}
+
+export function setServiceAccountJson(credentials: ServiceAccountCredentials | null): void {
+  invalidateDataCache();
+  if (credentials) {
+    saveCustomServiceAccount(credentials);
+    return;
+  }
+  clearCustomServiceAccount();
+}
+
+export function setServiceAccountFromRawJson(raw: string): void {
+  setServiceAccountJson(parseServiceAccountJson(raw));
+}
+
+export async function refreshLiveData(): Promise<void> {
+  if (!hasCustomServiceAccount()) {
+    invalidateDataCache();
+    return;
+  }
+  invalidateDataCache();
+  await getLiveReviews(true);
 }

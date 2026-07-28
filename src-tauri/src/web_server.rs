@@ -46,7 +46,7 @@ pub async fn run(port: u16) -> Result<(), Box<dyn std::error::Error + Send + Syn
 }
 
 async fn get_stats(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
-    match play_api::fetch_recent_reviews().await {
+    match play_api::fetch_recent_reviews(None).await {
         Ok(reviews) => Json(stats::build_stats(&reviews)).into_response(),
         Err(err) => app_error_to_response(err).into_response(),
     }
@@ -56,12 +56,12 @@ async fn get_reviews(
     State(_state): State<Arc<AppState>>,
     Query(filters): Query<ReviewFilters>,
 ) -> impl IntoResponse {
-    match play_api::fetch_recent_reviews().await {
+    match play_api::fetch_recent_reviews(None).await {
         Ok(reviews) => Json(stats::list_reviews(&reviews, filters)).into_response(),
         Err(err) => app_error_to_response(err).into_response(),
     }
 }
 
 async fn get_settings_handler() -> impl IntoResponse {
-    Json(stats::default_settings()).into_response()
+    Json(stats::default_settings(None)).into_response()
 }

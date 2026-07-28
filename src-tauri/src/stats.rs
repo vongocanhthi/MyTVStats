@@ -141,9 +141,9 @@ pub fn list_reviews(reviews: &[Review], filters: ReviewFilters) -> ReviewsPage {
     }
 }
 
-pub fn default_settings() -> crate::models::AppSettings {
+pub fn default_settings(service_account_path: Option<String>) -> crate::models::AppSettings {
     crate::models::AppSettings {
-        service_account_path: Some("bundled".into()),
+        service_account_path: service_account_path.or_else(|| Some("bundled".into())),
         package_name: PACKAGE_NAME.to_string(),
     }
 }

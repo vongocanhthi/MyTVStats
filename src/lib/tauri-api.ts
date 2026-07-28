@@ -23,3 +23,9 @@ export function listReviews(filters: ReviewFilters): Promise<ReviewsPage> {
 export function getSettings(): Promise<AppSettings> {
   return invoke<AppSettings>("get_settings");
 }
+
+export function setServiceAccountPath(path?: string | null): Promise<AppSettings> {
+  return invoke<AppSettings>("set_service_account_path", {
+    path: path?.trim() ? path : null,
+  });
+}

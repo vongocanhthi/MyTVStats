@@ -3,6 +3,8 @@ use crate::models::{Review, PACKAGE_NAME, PLAY_SCOPE, RECENT_WINDOW_DAYS};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::Deserialize;
+use std::fs;
+use std::path::Path;
 
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const REVIEWS_URL: &str = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications";
@@ -99,8 +101,8 @@ struct DeviceMetadata {
     device_class: Option<String>,
 }
 
-pub async fn fetch_recent_reviews() -> AppResult<Vec<Review>> {
-    let credentials = bundled_service_account()?;
+pub async fn fetch_recent_reviews(custom_service_account_path: Option<&str>) -> AppResult<Vec<Review>> {
+    let credentials = load_service_account(custom_service_account_path)?;
     let access_token = get_access_token(&credentials).await?;
     let window_start = (Utc::now() - Duration::days(RECENT_WINDOW_DAYS)).timestamp();
 
@@ -158,12 +160,29 @@ pub async fn fetch_recent_reviews() -> AppResult<Vec<Review>> {
     Ok(all_reviews)
 }
 
-fn bundled_service_account() -> AppResult<ServiceAccount> {
+fn load_service_account(custom_service_account_path: Option<&str>) -> AppResult<ServiceAccount> {
     if let Ok(raw) = std::env::var("GOOGLE_SERVICE_ACCOUNT_JSON") {
         return serde_json::from_str(&raw).map_err(|err| {
             AppError::Message(format!("Service Account JSON (env) không hợp lệ: {err}"))
         });
     }
+
+    if let Some(custom_path) = custom_service_account_path {
+        let path = Path::new(custom_path);
+        let raw = fs::read_to_string(path).map_err(|err| {
+            AppError::Message(format!(
+                "Không đọc được custom Service Account file `{}`: {err}",
+                path.display()
+            ))
+        })?;
+        return serde_json::from_str(&raw).map_err(|err| {
+            AppError::Message(format!(
+                "Custom Service Account JSON `{}` không hợp lệ: {err}",
+                path.display()
+            ))
+        });
+    }
+
     const RAW: &str = include_str!("../../credentials/service_account.json");
     serde_json::from_str(RAW).map_err(|err| {
         AppError::Message(format!("Service Account JSON không hợp lệ: {err}"))
