@@ -1,19 +1,23 @@
 # MyTV Stats
 
-Dashboard thống kê Google Play reviews cho `vn.mytvnet.mobileb2c`, xây bằng **Tauri 2 + React + SQLite**, hỗ trợ cả **desktop** và **web** (HTTP API).
+Dashboard thống kê Google Play reviews cho `vn.mytvnet.mobileb2c`.
+**Không dùng database** — mỗi lần xem gọi trực tiếp Play API (7 ngày gần nhất).
+
+Hỗ trợ: **Desktop (Tauri)** · **Web local (Rust API)** · **Vercel (Serverless TS)**.
 
 ## Tính năng
 
-- Import CSV reviews từ Google Play Console (full history)
-- Sync reviews qua Google Play Developer API (7 ngày gần nhất)
-- Dashboard: KPI, phân bố sao, trend tháng, top version
-- Bảng reviews: search, filter theo sao, phân trang
+- Lấy reviews realtime qua Google Play Developer API (7 ngày)
+- Dashboard: hôm nay + 7 ngày, phân bố sao, trend, top version
+- Bảng reviews: search, filter sao, phân trang
+- Nút **Làm mới dữ liệu** trong Settings
 
 ## Yêu cầu
 
 - Node.js 20+
-- Rust stable
-- Quyền Play Console + Service Account JSON (Reply to reviews)
+- Rust stable (cho desktop / `web:dev`)
+- Service Account JSON tại `src-tauri/credentials/service_account.json`
+  - Trên Vercel: set env `GOOGLE_SERVICE_ACCOUNT_JSON` = nội dung file JSON
 
 ## Chạy desktop (Tauri)
 
@@ -22,48 +26,40 @@ npm install
 npm run tauri dev
 ```
 
-## Chạy web (trình duyệt đầy đủ)
+## Chạy web local
 
 ```bash
 npm install
 npm run web:dev
 ```
 
-Mở `http://localhost:1420`. Vite proxy `/api/*` sang Rust HTTP server (`http://127.0.0.1:3001`).
+Mở `http://localhost:1420`. Vite proxy `/api/*` → Rust server (`:3001`), gọi Play API live.
 
-Trong Settings:
+## Deploy Vercel
 
-1. **Chọn** Service Account JSON → **Lưu cấu hình**
-2. **Import CSV vào DB** (upload file) hoặc **Sync reviews (7 ngày)**
+```bash
+npx vercel
+```
 
-DB web mặc định: `./data/mytvstats.db`. Service Account lưu tại `./data/service_account.json`.
+Env bắt buộc:
 
-> **Lưu ý multi-user:** bản web dùng **shared DB** — mọi người truy cập cùng một database/settings. Không có đăng nhập.
+| Key | Value |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Toàn bộ nội dung `service_account.json` |
 
-## Cấu hình Google Play API
-
-1. Google Cloud Console → bật **Google Play Android Developer API**
-2. Tạo Service Account, tải JSON key
-3. Play Console → Users and permissions → invite service account với quyền **Reply to reviews**
-4. Trong app: Settings → chọn JSON → Lưu → Sync
-
-## Import CSV
-
-Play Console → Reviews → Download CSV → Settings → Import.
+API serverless: `/api/stats`, `/api/reviews`, `/api/settings`.
 
 ## Lưu ý
 
-- API `reviews.list` chỉ trả về review tạo/sửa trong **7 ngày gần nhất**
-- Dùng CSV để bootstrap full history, sau đó sync API hàng ngày
-- Desktop: DB nằm trong app data directory của Tauri (`mytvstats.db`)
-- Web: DB nằm tại `./data/mytvstats.db`
+- Play API chỉ trả review tạo/sửa trong **~7 ngày**
+- Không lưu SQLite / không sync / không import CSV
+- Mỗi lần tải trang có thể mất vài giây (gọi Google)
 
 ## Scripts
 
 ```bash
-npm run web:dev      # Web đầy đủ: Rust API + Vite (khuyến nghị cho browser)
-npm run dev          # Vite frontend only (cần API riêng)
-npm run tauri dev    # Full desktop app
-npm run tauri build  # Build installer
+npm run web:dev      # Rust API live + Vite
+npm run tauri dev    # Desktop
+npm run build        # Frontend static (Vercel build)
+npx vercel           # Deploy
 ```
-# MyTVStats
