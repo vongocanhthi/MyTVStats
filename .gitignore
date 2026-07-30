@@ -23,10 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local data — bundled Play credentials in src-tauri/credentials/ are committed
+# Local credentials — user uploads / places file locally; never commit secrets
+src-tauri/credentials/service_account.json
+credentials/service_account.json
 *-service-account*.json
 *.db
 /data/
 /data-smoke/
 .vercel
 .env*
+
+# Local release artifacts
+release/

@@ -1,75 +1,55 @@
 # MyTV Stats
 
-Dashboard thống kê Google Play reviews cho `vn.mytvnet.mobileb2c`.
-**Không dùng database**. Web public chạy theo mô hình **static snapshot** 7 ngày gần nhất.
+App **desktop** (Windows & macOS) thống kê Google Play reviews cho `vn.mytvnet.mobileb2c`.
+**Không dùng database.** Chạy trên máy → tự sync và gửi mail báo cáo hàng ngày.
 
-Hỗ trợ: **Desktop (Tauri)** · **Web local (Rust API)** · **GitHub Pages (static)**.
+Repo **private**. Không deploy web/GitHub Pages làm sản phẩm chính.
 
 ## Tính năng
 
-- Lấy reviews 7 ngày gần nhất qua Google Play Developer API để sinh snapshot public
+- Lấy reviews **7 ngày** gần nhất qua Google Play Developer API
 - Dashboard: hôm nay + 7 ngày, phân bố sao, trend, top version
 - Bảng reviews: search, filter sao, phân trang
-- Tab Báo cáo theo ngày để copy/gửi Gmail
+- Báo cáo theo ngày + **gửi Gmail tự động** theo lịch (Asia/Ho_Chi_Minh)
+- Chạy nền / tray, khởi động cùng hệ thống
 
 ## Yêu cầu
 
 - Node.js 20+
-- Rust stable (cho desktop / `web:dev`)
-- Service Account JSON tại `src-tauri/credentials/service_account.json`
-  - Trên GitHub Actions: set secret `GOOGLE_SERVICE_ACCOUNT_JSON` = nội dung file JSON
+- Rust stable
+- Tài khoản Gmail có **2-Step Verification** + [App Password](https://myaccount.google.com/apppasswords)
+- Service Account JSON (Google Cloud / Play Console) — **không có sẵn trong repo**
 
-## Chạy desktop (Tauri)
+## Cài đặt & chạy
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
-## Chạy web local
+Mở tab **Settings** và cấu hình trực tiếp (lưu local trên máy, **không cần file `.env`**):
+
+1. **Service Account JSON** — upload một lần; app lưu vào thư mục config, lần sau không hỏi lại
+2. **Gmail gửi** + **App Password** + **Email nhận**
+3. **Giờ gửi** + bật lịch hàng ngày
+4. (Tuỳ chọn) khởi động cùng hệ thống
+5. Bấm **Lưu cấu hình** → **Chạy thử ngay** để kiểm tra
+
+Build release:
 
 ```bash
-npm install
-npm run web:dev
+npm run tauri build
 ```
 
-Mở `http://localhost:1420`. Vite proxy `/api/*` → Rust server (`:3001`), gọi Play API live.
+## Bảo mật
 
-## Generate snapshot public
-
-```bash
-npm run snapshot:generate
-```
-
-Tạo các file:
-
-- `public/snapshots/stats.json`
-- `public/snapshots/reviews.json`
-- `public/snapshots/settings.json`
-
-## Deploy GitHub Pages
-
-- Workflow `Refresh Snapshot`: gọi Play API bằng secret `GOOGLE_SERVICE_ACCOUNT_JSON`, cập nhật `public/snapshots/*`
-- Workflow `Deploy GitHub Pages`: build Vite static site và publish `dist`
-
-Secret bắt buộc:
-
-| Key | Value |
-|---|---|
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Toàn bộ nội dung `service_account.json` |
-
-## Lưu ý
-
-- Play API chỉ trả review tạo/sửa trong **~7 ngày**
-- Web public hiển thị snapshot đã build sẵn, không gọi Play API trực tiếp trên client
-- Nội dung reviews trong snapshot là **public** nếu site public
-- Không lưu SQLite / không import CSV
+- Không commit `service_account.json` hay App Password
+- Mẫu cấu trúc JSON: `src-tauri/credentials/service_account.example.json`
+- Credentials chỉ nằm trên máy (app config) sau khi upload trong Settings
 
 ## Scripts
 
 ```bash
-npm run web:dev      # Rust API live + Vite
-npm run tauri dev    # Desktop
-npm run snapshot:generate
-npm run build        # Frontend static cho GitHub Pages
+npm run tauri dev    # Desktop (dev)
+npm run tauri build  # Desktop (installer)
 ```

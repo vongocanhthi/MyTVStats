@@ -121,6 +121,48 @@ pub struct AppSettings {
     pub package_name: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ReportDayTarget {
+    #[default]
+    Yesterday,
+    Today,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScheduleSettings {
+    pub enabled: bool,
+    pub hour: u8,
+    pub minute: u8,
+    pub recipient: String,
+    #[serde(default)]
+    pub cc: Option<String>,
+    #[serde(default)]
+    pub bcc: Option<String>,
+    pub smtp_email: Option<String>,
+    pub smtp_app_password: Option<String>,
+    pub autostart_enabled: bool,
+    pub start_minimized: bool,
+    #[serde(default)]
+    pub report_day_target: ReportDayTarget,
+    pub last_run_day: Option<String>,
+    pub last_run_at: Option<i64>,
+    pub last_run_status: Option<ScheduleRunStatus>,
+    pub last_run_error: Option<String>,
+    /// Các key đã được override từ `.env` / `.env.local` (không lưu disk).
+    #[serde(default)]
+    pub env_overrides: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleRunStatus {
+    Success,
+    Failed,
+    Skipped,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewFilters {
     pub page: Option<u32>,

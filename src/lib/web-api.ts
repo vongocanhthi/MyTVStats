@@ -199,7 +199,9 @@ export async function getSettings(): Promise<AppSettings> {
   };
 }
 
-export function setServiceAccountJson(credentials: ServiceAccountCredentials | null): void {
+export async function setServiceAccountJson(
+  credentials: ServiceAccountCredentials | null,
+): Promise<void> {
   invalidateDataCache();
   if (credentials) {
     saveCustomServiceAccount(credentials);
@@ -208,8 +210,8 @@ export function setServiceAccountJson(credentials: ServiceAccountCredentials | n
   clearCustomServiceAccount();
 }
 
-export function setServiceAccountFromRawJson(raw: string): void {
-  setServiceAccountJson(parseServiceAccountJson(raw));
+export async function setServiceAccountFromRawJson(raw: string): Promise<void> {
+  await setServiceAccountJson(parseServiceAccountJson(raw));
 }
 
 export async function refreshLiveData(): Promise<void> {

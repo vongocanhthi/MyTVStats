@@ -29,6 +29,18 @@ export function todayDayKeyVn(): string {
   }).format(new Date());
 }
 
+/** Ngày hôm qua theo Asia/Ho_Chi_Minh (YYYY-MM-DD). */
+export function yesterdayDayKeyVn(): string {
+  const today = todayDayKeyVn();
+  const [year, month, day] = today.split("-").map((part) => Number.parseInt(part, 10));
+  const utcMidnight = Date.UTC(year, month - 1, day) - 24 * 60 * 60 * 1000;
+  const date = new Date(utcMidnight);
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** Đảm bảo luôn có dailyBreakdown để tab Báo cáo không trống khi API/cache cũ. */
 export function resolveDailyBreakdown(data: StatsOverview | undefined): DailyPeriodStats[] {
   if (!data) return [];
@@ -184,13 +196,16 @@ export function buildDailyReportText(
   return lines.join("\n");
 }
 
+export function buildReportSubject(dayKey: string): string {
+  return `Báo cáo MyTV Reviews — ${formatDayShortVn(dayKey)}`;
+}
+
 /** Mở Gmail compose với sẵn subject + body (user có thể chỉnh trước khi gửi). */
-export function buildGmailComposeUrl(dayKey: string, body: string): string {
-  const subject = `Báo cáo MyTV Reviews — ${formatDayShortVn(dayKey)}`;
+export function buildGmailComposeUrl(dayKey: string, body: string, subject?: string): string {
   const params = new URLSearchParams({
     view: "cm",
     fs: "1",
-    su: subject,
+    su: subject?.trim() || buildReportSubject(dayKey),
     body,
   });
   return `https://mail.google.com/mail/?${params.toString()}`;

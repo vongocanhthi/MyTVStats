@@ -6,7 +6,7 @@ export const config = {
 
 export default async function handler(): Promise<Response> {
   return Response.json({
-    serviceAccountPath: "bundled",
+    serviceAccountPath: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ? "env" : null,
     packageName: PACKAGE_NAME_EXPORT,
   });
 }

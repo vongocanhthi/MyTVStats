@@ -168,24 +168,38 @@ fn load_service_account(custom_service_account_path: Option<&str>) -> AppResult<
     }
 
     if let Some(custom_path) = custom_service_account_path {
-        let path = Path::new(custom_path);
-        let raw = fs::read_to_string(path).map_err(|err| {
-            AppError::Message(format!(
-                "Không đọc được custom Service Account file `{}`: {err}",
-                path.display()
-            ))
-        })?;
-        return serde_json::from_str(&raw).map_err(|err| {
-            AppError::Message(format!(
-                "Custom Service Account JSON `{}` không hợp lệ: {err}",
-                path.display()
-            ))
-        });
+        return read_service_account_file(Path::new(custom_path));
     }
 
-    const RAW: &str = include_str!("../../credentials/service_account.json");
-    serde_json::from_str(RAW).map_err(|err| {
-        AppError::Message(format!("Service Account JSON không hợp lệ: {err}"))
+    // Local/dev only — file này gitignored, không có trong repo.
+    for candidate in [
+        "src-tauri/credentials/service_account.json",
+        "credentials/service_account.json",
+    ] {
+        let path = Path::new(candidate);
+        if path.exists() {
+            return read_service_account_file(path);
+        }
+    }
+
+    Err(AppError::Message(
+        "Chưa cấu hình Service Account. Vào Settings → upload file JSON (lưu local trên máy)."
+            .into(),
+    ))
+}
+
+fn read_service_account_file(path: &Path) -> AppResult<ServiceAccount> {
+    let raw = fs::read_to_string(path).map_err(|err| {
+        AppError::Message(format!(
+            "Không đọc được Service Account file `{}`: {err}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_str(&raw).map_err(|err| {
+        AppError::Message(format!(
+            "Service Account JSON `{}` không hợp lệ: {err}",
+            path.display()
+        ))
     })
 }
 

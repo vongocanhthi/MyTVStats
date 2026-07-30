@@ -16,10 +16,10 @@ interface LayoutProps {
 }
 
 const tabs: { id: TabId; label: string; icon: typeof Star }[] = [
-  { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-  { id: "reviews", label: "Reviews", icon: MessageSquare },
+  { id: "dashboard", label: "Tổng quan", icon: BarChart3 },
+  { id: "reviews", label: "Đánh giá", icon: MessageSquare },
   { id: "report", label: "Báo cáo", icon: FileText },
-  { id: "settings", label: "Settings", icon: Settings },
+  { id: "settings", label: "Cài đặt", icon: Settings },
 ];
 
 export function Layout({ activeTab, onTabChange, children }: LayoutProps) {

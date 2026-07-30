@@ -60,7 +60,7 @@ function SortToggle({
   );
 }
 
-const PAGE_SIZE_OPTIONS = [50, 100, 200] as const;
+const PAGE_SIZE_OPTIONS = [10, 50, 100, 200] as const;
 
 export function ReviewsTable() {
   const [page, setPage] = useState(1);
@@ -68,7 +68,7 @@ export function ReviewsTable() {
   const [starFilter, setStarFilter] = useState<number | undefined>();
   const [sortBy, setSortBy] = useState<ReviewSortField>("lastModifiedAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [pageSize, setPageSize] = useState<number>(50);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   const filters = useMemo(
     () => ({

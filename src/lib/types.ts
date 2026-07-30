@@ -101,4 +101,29 @@ export interface AppSettings {
   packageName: string;
 }
 
+export type ScheduleRunStatus = "success" | "failed" | "skipped";
+
+/** Ngày review dùng cho báo cáo tự động. Mặc định hôm qua. */
+export type ReportDayTarget = "yesterday" | "today";
+
+export interface ScheduleSettings {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+  recipient: string;
+  cc?: string | null;
+  bcc?: string | null;
+  smtpEmail?: string | null;
+  smtpAppPassword?: string | null;
+  autostartEnabled: boolean;
+  startMinimized: boolean;
+  reportDayTarget?: ReportDayTarget;
+  lastRunDay?: string | null;
+  lastRunAt?: number | null;
+  lastRunStatus?: ScheduleRunStatus | null;
+  lastRunError?: string | null;
+  /** Deprecated: env overrides đã tắt; luôn rỗng. */
+  envOverrides?: string[];
+}
+
 export type TabId = "dashboard" | "reviews" | "report" | "settings";

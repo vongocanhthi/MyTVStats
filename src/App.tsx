@@ -7,6 +7,7 @@ import { ReportPanel } from "./features/report/ReportPanel";
 import { ReviewsTable } from "./features/reviews/ReviewsTable";
 import { SettingsPanel } from "./features/settings/SettingsPanel";
 import { isAuthenticated } from "./lib/auth";
+import { isTauriRuntime } from "./lib/runtime";
 import type { TabId } from "./lib/types";
 
 const queryClient = new QueryClient({
@@ -20,7 +21,7 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
-  const [authed, setAuthed] = useState(() => isAuthenticated());
+  const [authed, setAuthed] = useState(() => isTauriRuntime() || isAuthenticated());
 
   if (!authed) {
     return <LoginDialog onSuccess={() => setAuthed(true)} />;

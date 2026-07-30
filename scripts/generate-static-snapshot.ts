@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const reviews = await fetchRecentReviews();
   const stats = buildStats(reviews);
   const settings: AppSettingsSnapshot = {
-    serviceAccountPath: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ? "env" : "bundled",
+    serviceAccountPath: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ? "env" : "local",
     packageName: PACKAGE_NAME_EXPORT,
   };
 

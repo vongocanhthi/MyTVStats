@@ -30,7 +30,7 @@ function loadServiceAccount(): ServiceAccount {
     }
   }
   throw new Error(
-    "Thiếu GOOGLE_SERVICE_ACCOUNT_JSON hoặc file src-tauri/credentials/service_account.json",
+    "Thiếu GOOGLE_SERVICE_ACCOUNT_JSON hoặc file local src-tauri/credentials/service_account.json (không commit file này).",
   );
 }
 
