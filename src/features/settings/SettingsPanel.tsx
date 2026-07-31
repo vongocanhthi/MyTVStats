@@ -1,22 +1,17 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Eye, EyeOff, Info, LogOut, RefreshCw } from "lucide-react";
+import { CheckCircle2, ExternalLink, Eye, EyeOff, Info, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   getScheduleSettings,
   getSettings,
   getStats,
-  invalidateDataCache,
-  refreshLiveData,
   runDailyReportNow,
   setAutostartEnabled,
   setServiceAccountFromRawJson,
   setServiceAccountJson,
   setScheduleSettings,
 } from "../../lib/api";
-import { getStoredSession, logout } from "../../lib/auth";
-import { getServiceAccountLabel } from "../../lib/service-account-store";
 import { PACKAGE_NAME } from "../../lib/play-console-links";
-import { isTauriRuntime } from "../../lib/runtime";
 import type { AppSettings, ReportDayTarget, ScheduleSettings } from "../../lib/types";
 import {
   formatDayLabelVn,
@@ -26,12 +21,7 @@ import {
 import { formatDate } from "../../lib/utils";
 import { ScheduleTimePicker } from "./ScheduleTimePicker";
 
-interface SettingsPanelProps {
-  onLogout: () => void;
-}
-
-export function SettingsPanel({ onLogout }: SettingsPanelProps) {
-  const isDesktop = isTauriRuntime();
+export function SettingsPanel() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -43,16 +33,13 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
   const [scheduleForm, setScheduleForm] = useState<ScheduleSettings | null>(null);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [savedJsonFileName, setSavedJsonFileName] = useState<string | null>(null);
-  const session = getStoredSession();
 
   const settingsQuery = useQuery({
     queryKey: ["settings"],
     queryFn: getSettings,
   });
 
-  const serviceAccountLabel =
-    settingsQuery.data?.serviceAccountPath ??
-    (isDesktop ? "chưa cấu hình" : getServiceAccountLabel());
+  const serviceAccountLabel = settingsQuery.data?.serviceAccountPath ?? "chưa cấu hình";
   const hasCustomServiceAccount = serviceAccountLabel.startsWith("custom");
   const serviceAccountEmail = hasCustomServiceAccount
     ? serviceAccountLabel.replace(/^custom\s*\(/, "").replace(/\)$/, "")
@@ -65,13 +52,7 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
 
   const scheduleQuery = useQuery({
     queryKey: ["schedule-settings"],
-    queryFn: async () => {
-      if (!getScheduleSettings) {
-        throw new Error("Desktop scheduler chưa khả dụng.");
-      }
-      return getScheduleSettings();
-    },
-    enabled: isDesktop && !!getScheduleSettings,
+    queryFn: getScheduleSettings,
   });
 
   useEffect(() => {
@@ -86,19 +67,15 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
     setMessage(
       hasCustomServiceAccount
         ? "Đang tải dữ liệu từ Google Play API..."
-        : "Đang tải lại snapshot public...",
+        : "Cần upload Service Account trước khi tải dữ liệu.",
     );
     try {
-      invalidateDataCache?.();
-      if (hasCustomServiceAccount && refreshLiveData) {
-        await refreshLiveData();
-      }
       await queryClient.invalidateQueries({ queryKey: ["stats"] });
       await queryClient.invalidateQueries({ queryKey: ["reviews"] });
       await queryClient.invalidateQueries({ queryKey: ["settings"] });
       await queryClient.fetchQuery({ queryKey: ["stats"], queryFn: getStats });
       setMessageKind("success");
-      setMessage(hasCustomServiceAccount ? "Đã tải lại dữ liệu live." : "Đã tải lại snapshot.");
+      setMessage("Đã tải lại dữ liệu live.");
     } catch (error) {
       setMessageKind("error");
       setMessage(error instanceof Error ? error.message : String(error));
@@ -108,32 +85,21 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
   }
 
   async function handleServiceAccountFile(file: File | null) {
-    if (!file || !setServiceAccountFromRawJson) return;
+    if (!file) return;
     setIsSavingFile(true);
     setMessageKind("info");
     setMessage("Đang lưu file Service Account...");
     try {
       const raw = await file.text();
       const updated = await setServiceAccountFromRawJson(raw);
-      if (updated && typeof updated === "object" && "packageName" in updated) {
-        queryClient.setQueryData<AppSettings>(["settings"], updated as AppSettings);
-      } else {
-        queryClient.setQueryData<AppSettings>(["settings"], (current) => ({
-          packageName: current?.packageName ?? PACKAGE_NAME,
-          serviceAccountPath: getServiceAccountLabel(),
-        }));
-      }
+      queryClient.setQueryData<AppSettings>(["settings"], updated);
       setSavedJsonFileName(file.name);
       await queryClient.invalidateQueries({ queryKey: ["settings"] });
       await queryClient.invalidateQueries({ queryKey: ["stats"] });
       await queryClient.invalidateQueries({ queryKey: ["reviews"] });
       await settingsQuery.refetch();
       setMessageKind("success");
-      setMessage(
-        isDesktop
-          ? `Đã lưu “${file.name}” trên máy. Lần sau không cần upload lại.`
-          : `Đã lưu “${file.name}” trên trình duyệt này.`,
-      );
+      setMessage(`Đã lưu “${file.name}” trên máy. Lần sau không cần upload lại.`);
     } catch (error) {
       setMessageKind("error");
       setMessage(error instanceof Error ? error.message : String(error));
@@ -146,32 +112,19 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
   }
 
   async function handleUseDefaultAccount() {
-    if (!setServiceAccountJson) return;
     setIsSavingFile(true);
     setMessageKind("info");
-    setMessage(isDesktop ? "Đang xóa Service Account local..." : "Đang chuyển về snapshot public...");
+    setMessage("Đang xóa Service Account local...");
     try {
       const updated = await setServiceAccountJson(null);
-      if (updated && typeof updated === "object" && "packageName" in updated) {
-        queryClient.setQueryData<AppSettings>(["settings"], updated as AppSettings);
-      } else {
-        queryClient.setQueryData<AppSettings>(["settings"], (current) =>
-          current
-            ? { ...current, serviceAccountPath: isDesktop ? null : "snapshot" }
-            : current,
-        );
-      }
+      queryClient.setQueryData<AppSettings>(["settings"], updated);
       setSavedJsonFileName(null);
       await queryClient.invalidateQueries({ queryKey: ["settings"] });
       await queryClient.invalidateQueries({ queryKey: ["stats"] });
       await queryClient.invalidateQueries({ queryKey: ["reviews"] });
       await settingsQuery.refetch();
       setMessageKind("success");
-      setMessage(
-        isDesktop
-          ? "Đã xóa Service Account local. Upload lại khi cần dùng API."
-          : "Đã chuyển về snapshot public mặc định.",
-      );
+      setMessage("Đã xóa Service Account local. Upload lại khi cần dùng API.");
     } catch (error) {
       setMessageKind("error");
       setMessage(error instanceof Error ? error.message : String(error));
@@ -183,14 +136,8 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
     }
   }
 
-  function handleLogout() {
-    logout();
-    queryClient.clear();
-    onLogout();
-  }
-
   async function handleSaveSchedule() {
-    if (!scheduleForm || !setScheduleSettings) return;
+    if (!scheduleForm) return;
     setIsSavingSchedule(true);
     setMessageKind("info");
     setMessage("Đang lưu cấu hình báo cáo tự động...");
@@ -209,7 +156,6 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
   }
 
   async function handleRunNow() {
-    if (!runDailyReportNow) return;
     setIsRunningNow(true);
     setMessageKind("info");
     setMessage("Đang sync dữ liệu và gửi mail báo cáo...");
@@ -234,7 +180,7 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
   }
 
   async function handleAutostartToggle(enabled: boolean) {
-    if (!setAutostartEnabled || !scheduleForm) return;
+    if (!scheduleForm) return;
     setIsSavingSchedule(true);
     setMessageKind("info");
     setMessage(enabled ? "Đang bật khởi động cùng hệ thống..." : "Đang tắt khởi động cùng hệ thống...");
@@ -261,24 +207,14 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
 
   return (
     <div className="space-y-6">
-      {isDesktop ? (
-        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-4 text-sm text-sky-100">
-          <p className="font-medium text-sky-50">Desktop only (Windows & macOS)</p>
-          <p className="mt-1">
-            Toàn bộ cấu hình nằm trong Settings và lưu local trên máy — không cần file{" "}
-            <code className="text-sky-200">.env</code>. Upload Service Account một lần, điền Gmail /
-            lịch gửi, rồi Lưu.
-          </p>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
-          <p className="font-medium text-amber-50">Chế độ xem web</p>
-          <p className="mt-1">
-            Sản phẩm chính là app desktop (Windows & macOS) để chạy nền và gửi mail tự động. Web chỉ
-            dùng tạm khi dev — không có lịch gửi báo cáo.
-          </p>
-        </div>
-      )}
+      <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-4 text-sm text-sky-100">
+        <p className="font-medium text-sky-50">Desktop only (Windows & macOS)</p>
+        <p className="mt-1">
+          Toàn bộ cấu hình nằm trong Settings và lưu local trên máy — không cần file{" "}
+          <code className="text-sky-200">.env</code>. Upload Service Account một lần, điền Gmail /
+          lịch gửi, rồi Lưu.
+        </p>
+      </div>
 
       {message ? (
         <div className={`rounded-2xl border px-4 py-3 text-sm ${messageStyles}`}>
@@ -340,7 +276,7 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
             onClick={() => {
               void handleRefresh();
             }}
-            disabled={isRefreshing || (isDesktop && !hasCustomServiceAccount)}
+            disabled={isRefreshing || !hasCustomServiceAccount}
             className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:opacity-50"
           >
             <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
@@ -354,12 +290,12 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
             disabled={isSavingFile || !hasCustomServiceAccount}
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
           >
-            {isDesktop ? "Xóa file đã lưu" : "Dùng snapshot mặc định"}
+            Xóa file đã lưu
           </button>
         </div>
       </section>
 
-      {isDesktop && scheduleForm ? (
+      {scheduleForm ? (
         <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-medium text-white">2. Báo cáo tự động</h2>
           <p className="mt-2 text-sm text-slate-400">
@@ -662,29 +598,6 @@ export function SettingsPanel({ onLogout }: SettingsPanelProps) {
             </p>
           </div>
         </section>
-
-        {!isDesktop ? (
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-medium text-white">Tài khoản</h2>
-          <p className="mt-2 text-sm text-slate-400">
-            Phiên đăng nhập được lưu trên trình duyệt / máy này để lần sau không cần nhập lại.
-          </p>
-          <div className="mt-5 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-400">
-            <p>
-              <span className="text-slate-300">Đang đăng nhập:</span>{" "}
-              {session?.username ?? "—"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/5"
-          >
-            <LogOut size={16} />
-            Đăng xuất
-          </button>
-        </section>
-        ) : null}
       </div>
     </div>
   );

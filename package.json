@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "web:dev": "bash scripts/web-dev.sh",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "snapshot:generate": "tsx scripts/generate-static-snapshot.ts",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -18,7 +16,6 @@
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "clsx": "^2.1.1",
-    "google-auth-library": "^10.9.1",
     "lucide-react": "^0.544.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -32,7 +29,6 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "tailwindcss": "^4.1.13",
-    "tsx": "^4.23.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
   }

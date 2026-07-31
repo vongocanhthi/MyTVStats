@@ -8,7 +8,6 @@ mod report;
 mod scheduler;
 mod settings_store;
 mod stats;
-mod web_server;
 
 use crate::error::{AppError, AppResult};
 use tauri::Manager;
@@ -60,11 +59,6 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-/// Start HTTP server for browser/web usage (live Play API, no database).
-pub async fn run_web_server(port: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    web_server::run(port).await
 }
 
 fn setup_tray(app: &mut tauri::App) -> AppResult<()> {

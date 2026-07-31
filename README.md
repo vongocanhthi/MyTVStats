@@ -3,8 +3,6 @@
 App **desktop** (Windows & macOS) thống kê Google Play reviews cho `vn.mytvnet.mobileb2c`.
 **Không dùng database.** Chạy trên máy → tự sync và gửi mail báo cáo hàng ngày.
 
-Repo **private**. Không deploy web/GitHub Pages làm sản phẩm chính.
-
 ## Tính năng
 
 - Lấy reviews **7 ngày** gần nhất qua Google Play Developer API

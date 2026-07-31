@@ -10,14 +10,14 @@ export function ScopeBanner({ stats }: ScopeBannerProps) {
     <div className="flex gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
       <AlertTriangle className="mt-0.5 shrink-0" size={18} />
       <div>
-        <p className="font-medium text-amber-50">Snapshot public 7 ngày</p>
+        <p className="font-medium text-amber-50">Phạm vi 7 ngày gần nhất</p>
         <p className="mt-1 text-amber-100/90">
-          Không lưu database trên web public. Site hiển thị snapshot đã build sẵn cho{" "}
-          <strong>hôm nay</strong> / <strong>7 ngày</strong>, không phải rating tổng trên Store.
+          App lấy reviews tạo/sửa trong <strong>7 ngày</strong> qua Google Play API — không phải
+          rating tổng trên Store.
         </p>
         <p className="mt-2 flex items-start gap-1.5 text-amber-100/80">
           <Info size={14} className="mt-0.5 shrink-0" />
-          Đang hiển thị {stats.apiReviewCount.toLocaleString("vi-VN")} review trong snapshot.
+          Đang hiển thị {stats.apiReviewCount.toLocaleString("vi-VN")} review trong cửa sổ này.
         </p>
       </div>
     </div>

@@ -32,9 +32,7 @@ function AppContent() {
       {activeTab === "dashboard" ? <Dashboard /> : null}
       {activeTab === "reviews" ? <ReviewsTable /> : null}
       {activeTab === "report" ? <ReportPanel /> : null}
-      {activeTab === "settings" ? (
-        <SettingsPanel onLogout={() => setAuthed(false)} />
-      ) : null}
+      {activeTab === "settings" ? <SettingsPanel /> : null}
     </Layout>
   );
 }

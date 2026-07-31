@@ -62,13 +62,8 @@ export function ReportPanel() {
 
   const scheduleQuery = useQuery({
     queryKey: ["schedule-settings"],
-    queryFn: async () => {
-      if (!getScheduleSettings) {
-        throw new Error("Chưa có cấu hình gửi mail trên desktop.");
-      }
-      return getScheduleSettings();
-    },
-    enabled: isDesktop && !!getScheduleSettings,
+    queryFn: getScheduleSettings,
+    enabled: isDesktop,
   });
 
   useEffect(() => {
@@ -143,7 +138,7 @@ export function ReportPanel() {
   function handleRequestSendNow() {
     setSendMessage(null);
     setSendError(null);
-    if (!isDesktop || !sendReportNow) {
+    if (!isDesktop) {
       setSendError("Gửi ngay chỉ khả dụng trên app desktop (Windows / macOS).");
       return;
     }
