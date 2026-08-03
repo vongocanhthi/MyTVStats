@@ -94,6 +94,53 @@ pub fn build_daily_report_text(day_key: &str, stats: &PeriodStats, reviews: &[Re
     lines.join("\n")
 }
 
+pub const DEEPSEEK_EMAIL_SUBJECT: &str = "Báo cáo đánh giá MyTV";
+
+/// Mẫu mail khi ngày báo cáo có 0 review — không gọi DeepSeek.
+pub fn build_zero_review_report_body(day_key: &str) -> String {
+    format!(
+        "Kính gửi Anh/Chị,\n\n\
+Dưới đây là tóm tắt đánh giá của khách hàng trên Google Play trong kỳ báo cáo ngày {day_key}.\n\n\
+Đánh giá tích cực (0 đánh giá)\n\
+- Không ghi nhận đánh giá tích cực trong kỳ báo cáo.\n\n\
+Đánh giá tiêu cực (0 đánh giá)\n\
+- Không ghi nhận đánh giá tiêu cực trong kỳ báo cáo.\n\n\
+Trân trọng."
+    )
+}
+
+/// Lấy Subject từ dòng `Subject:` / `Tiêu đề:` nếu có; không thì dùng mặc định.
+pub fn extract_deepseek_subject(text: &str) -> String {
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let value = trimmed
+            .strip_prefix("Subject:")
+            .or_else(|| trimmed.strip_prefix("Tiêu đề:"))
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if let Some(subject) = value {
+            return subject.to_string();
+        }
+    }
+    DEEPSEEK_EMAIL_SUBJECT.to_string()
+}
+
+/// Bỏ dòng Subject/Tiêu đề khỏi body khi gửi mail.
+pub fn strip_deepseek_subject_line(text: &str) -> String {
+    let mut lines = text.lines().peekable();
+    if let Some(first) = lines.peek() {
+        let trimmed = first.trim();
+        if trimmed.starts_with("Subject:") || trimmed.starts_with("Tiêu đề:") {
+            lines.next();
+            while lines.peek().is_some_and(|line| line.trim().is_empty()) {
+                lines.next();
+            }
+            return lines.collect::<Vec<_>>().join("\n").trim_start().to_string();
+        }
+    }
+    text.trim_start().to_string()
+}
+
 pub fn build_report_subject(day_key: &str) -> String {
     format!("Báo cáo MyTV Reviews — {}", format_day_short_vn(day_key))
 }

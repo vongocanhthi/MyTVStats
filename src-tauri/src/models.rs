@@ -156,6 +156,158 @@ pub struct ScheduleSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepSeekSettings {
+    pub api_key: Option<String>,
+    pub prompt: String,
+    #[serde(default)]
+    pub last_report_day: Option<String>,
+    #[serde(default)]
+    pub last_report_text: Option<String>,
+}
+
+impl Default for DeepSeekSettings {
+    fn default() -> Self {
+        Self {
+            api_key: None,
+            prompt: DEFAULT_DEEPSEEK_PROMPT.to_string(),
+            last_report_day: None,
+            last_report_text: None,
+        }
+    }
+}
+
+pub const DEFAULT_DEEPSEEK_PROMPT: &str = "Bạn là chuyên viên phân tích phản hồi khách hàng của ứng dụng MyTV.
+
+Nhiệm vụ:
+Phân tích báo cáo review dưới đây và viết nội dung tóm tắt để gửi email nội bộ.
+
+Yêu cầu:
+- Viết bằng tiếng Việt.
+- Văn phong chuyên nghiệp, ngắn gọn, dễ đọc.
+- Tiêu đề email (Subject): Báo cáo đánh giá MyTV (chỉ để tham khảo khi gửi email, không đưa vào nội dung)
+- Trong nội dung email, chỉ ghi ngày của báo cáo (lấy từ dữ liệu đầu vào) ở câu mở đầu, không tạo dòng tiêu đề riêng.
+- Chia thành đúng 2 phần:
+  1. Đánh giá tích cực
+  2. Đánh giá tiêu cực
+- Mỗi phần phải bắt đầu bằng số lượng đánh giá thuộc nhóm đó.
+- Tổng hợp các ý giống nhau thành một nhận định, không liệt kê từng review.
+- Có thể sử dụng các số liệu như tổng số review, điểm trung bình và tỷ lệ phản hồi để làm rõ nhận định.
+- Nếu không có đánh giá tích cực hoặc tiêu cực thì ghi rõ \"Không ghi nhận ...\".
+- Không thêm thông tin ngoài dữ liệu.
+
+Định dạng đầu ra:
+
+Kính gửi Anh/Chị,
+
+Dưới đây là tóm tắt đánh giá của khách hàng trên Google Play trong kỳ báo cáo ngày [Ngày của báo cáo].
+
+Đánh giá tích cực (X đánh giá)
+- ...
+
+Đánh giá tiêu cực (Y đánh giá)
+- ...
+
+Trân trọng.
+
+Dữ liệu báo cáo:
+
+{{REPORT}}";
+
+/// Prompt mặc định cũ (v1) — migrate máy đã lưu local.
+pub const LEGACY_DEFAULT_DEEPSEEK_PROMPT_V1: &str = "Bạn là trợ lý phân tích reviews Google Play cho app MyTV. \
+Viết lại báo cáo ngắn gọn, rõ ràng bằng tiếng Việt dựa trên dữ liệu được cung cấp. \
+Giữ số liệu chính xác, nêu điểm nổi bật (sao thấp, phản hồi, phiên bản), \
+và kết luận ngắn cho team. Không bịa thêm số liệu.";
+
+/// Prompt mặc định cũ (v2 — có dòng Tiêu đề kèm ngày).
+pub const LEGACY_DEFAULT_DEEPSEEK_PROMPT_V2: &str = "Bạn là chuyên viên phân tích phản hồi khách hàng của ứng dụng MyTV.
+
+Nhiệm vụ:
+Phân tích báo cáo review dưới đây và viết nội dung tóm tắt để gửi email nội bộ.
+
+Yêu cầu:
+- Viết bằng tiếng Việt.
+- Văn phong chuyên nghiệp, ngắn gọn, dễ đọc.
+- Bắt đầu email bằng dòng tiêu đề nêu rõ ngày của báo cáo (lấy từ dữ liệu đầu vào).
+- Chia thành đúng 2 phần:
+  1. Đánh giá tích cực
+  2. Đánh giá tiêu cực
+- Mỗi phần phải bắt đầu bằng số lượng đánh giá thuộc nhóm đó.
+- Tổng hợp các ý giống nhau thành một nhận định, không liệt kê từng review.
+- Có thể sử dụng các số liệu như tổng số review, điểm trung bình và tỷ lệ phản hồi để làm rõ nhận định.
+- Nếu không có đánh giá tích cực hoặc tiêu cực thì ghi rõ \"Không ghi nhận ...\".
+- Không thêm thông tin ngoài dữ liệu.
+
+Định dạng đầu ra:
+
+Tiêu đề: Báo cáo đánh giá MyTV – [Ngày của báo cáo]
+
+Kính gửi Anh/Chị,
+
+Dưới đây là tóm tắt đánh giá của khách hàng trên Google Play trong kỳ báo cáo.
+
+Đánh giá tích cực (X đánh giá)
+- ...
+
+Đánh giá tiêu cực (Y đánh giá)
+- ...
+
+Trân trọng.
+
+Dữ liệu báo cáo:
+
+{{REPORT}}";
+
+/// Prompt mặc định cũ (v3 — có dòng Subject trong output).
+pub const LEGACY_DEFAULT_DEEPSEEK_PROMPT_V3: &str = "Bạn là chuyên viên phân tích phản hồi khách hàng của ứng dụng MyTV.
+
+Nhiệm vụ:
+Phân tích báo cáo review dưới đây và viết nội dung tóm tắt để gửi email nội bộ.
+
+Yêu cầu:
+- Viết bằng tiếng Việt.
+- Văn phong chuyên nghiệp, ngắn gọn, dễ đọc.
+- Tiêu đề email (Subject): Báo cáo đánh giá MyTV
+- Trong nội dung email, chỉ ghi ngày của báo cáo (lấy từ dữ liệu đầu vào) ở câu mở đầu, không tạo dòng tiêu đề riêng.
+- Chia thành đúng 2 phần:
+  1. Đánh giá tích cực
+  2. Đánh giá tiêu cực
+- Mỗi phần phải bắt đầu bằng số lượng đánh giá thuộc nhóm đó.
+- Tổng hợp các ý giống nhau thành một nhận định, không liệt kê từng review.
+- Có thể sử dụng các số liệu như tổng số review, điểm trung bình và tỷ lệ phản hồi để làm rõ nhận định.
+- Nếu không có đánh giá tích cực hoặc tiêu cực thì ghi rõ \"Không ghi nhận ...\".
+- Không thêm thông tin ngoài dữ liệu.
+
+Định dạng đầu ra:
+
+Subject: Báo cáo đánh giá MyTV
+
+Kính gửi Anh/Chị,
+
+Dưới đây là tóm tắt đánh giá của khách hàng trên Google Play trong kỳ báo cáo ngày [Ngày của báo cáo].
+
+Đánh giá tích cực (X đánh giá)
+- ...
+
+Đánh giá tiêu cực (Y đánh giá)
+- ...
+
+Trân trọng.
+
+Dữ liệu báo cáo:
+
+{{REPORT}}";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepSeekGenerateResult {
+    pub day: String,
+    pub text: String,
+    pub settings: DeepSeekSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScheduleRunStatus {
     Success,

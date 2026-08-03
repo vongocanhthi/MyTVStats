@@ -2,17 +2,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Eye, EyeOff, Info, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
+  getDeepSeekSettings,
   getScheduleSettings,
   getSettings,
   getStats,
   runDailyReportNow,
   setAutostartEnabled,
+  setDeepSeekSettings,
   setServiceAccountFromRawJson,
   setServiceAccountJson,
   setScheduleSettings,
 } from "../../lib/api";
 import { PACKAGE_NAME } from "../../lib/play-console-links";
-import type { AppSettings, ReportDayTarget, ScheduleSettings } from "../../lib/types";
+import { DEFAULT_DEEPSEEK_PROMPT } from "../../lib/deepseek-prompt";
+import type { AppSettings, DeepSeekSettings, ReportDayTarget, ScheduleSettings } from "../../lib/types";
 import {
   formatDayLabelVn,
   todayDayKeyVn,
@@ -21,9 +24,15 @@ import {
 import { formatDate } from "../../lib/utils";
 import { ScheduleTimePicker } from "./ScheduleTimePicker";
 
+const SCHEDULE_AUTOSAVE_MS = 700;
+
 export function SettingsPanel() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scheduleFormRef = useRef<ScheduleSettings | null>(null);
+  const skipScheduleAutoSaveRef = useRef(false);
+  const scheduleSavingRef = useRef(false);
+  const scheduleNeedsResaveRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingFile, setIsSavingFile] = useState(false);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
@@ -31,8 +40,20 @@ export function SettingsPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [messageKind, setMessageKind] = useState<"info" | "success" | "error">("info");
   const [scheduleForm, setScheduleForm] = useState<ScheduleSettings | null>(null);
+  const [scheduleAutoSaveStatus, setScheduleAutoSaveStatus] = useState<
+    "idle" | "pending" | "saving" | "saved" | "error"
+  >("idle");
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [savedJsonFileName, setSavedJsonFileName] = useState<string | null>(null);
+  const deepseekFormRef = useRef<DeepSeekSettings | null>(null);
+  const skipDeepseekAutoSaveRef = useRef(false);
+  const deepseekSavingRef = useRef(false);
+  const deepseekNeedsResaveRef = useRef(false);
+  const [deepseekForm, setDeepseekForm] = useState<DeepSeekSettings | null>(null);
+  const [showDeepseekKey, setShowDeepseekKey] = useState(false);
+  const [deepseekAutoSaveStatus, setDeepseekAutoSaveStatus] = useState<
+    "idle" | "pending" | "saving" | "saved" | "error"
+  >("idle");
 
   const settingsQuery = useQuery({
     queryKey: ["settings"],
@@ -55,11 +76,157 @@ export function SettingsPanel() {
     queryFn: getScheduleSettings,
   });
 
+  const deepseekQuery = useQuery({
+    queryKey: ["deepseek-settings"],
+    queryFn: getDeepSeekSettings,
+  });
+
+  scheduleFormRef.current = scheduleForm;
+  deepseekFormRef.current = deepseekForm;
+
+  function applyServerSchedule(settings: ScheduleSettings) {
+    skipScheduleAutoSaveRef.current = true;
+    setScheduleForm(settings);
+    queryClient.setQueryData<ScheduleSettings>(["schedule-settings"], settings);
+  }
+
+  function applyServerDeepseek(settings: DeepSeekSettings) {
+    skipDeepseekAutoSaveRef.current = true;
+    setDeepseekForm(settings);
+    queryClient.setQueryData<DeepSeekSettings>(["deepseek-settings"], settings);
+  }
+
+  // Chỉ hydrate lần đầu — không ghi đè khi user đang nhập.
   useEffect(() => {
-    if (scheduleQuery.data) {
+    if (scheduleQuery.data && scheduleForm === null) {
+      skipScheduleAutoSaveRef.current = true;
       setScheduleForm(scheduleQuery.data);
     }
-  }, [scheduleQuery.data]);
+  }, [scheduleQuery.data, scheduleForm]);
+
+  useEffect(() => {
+    if (deepseekQuery.data && deepseekForm === null) {
+      skipDeepseekAutoSaveRef.current = true;
+      setDeepseekForm(deepseekQuery.data);
+    }
+  }, [deepseekQuery.data, deepseekForm]);
+
+  // Tự lưu local khi nhập (debounce) — lần sau mở app vẫn còn.
+  useEffect(() => {
+    if (!scheduleForm) return;
+    if (skipScheduleAutoSaveRef.current) {
+      skipScheduleAutoSaveRef.current = false;
+      return;
+    }
+
+    setScheduleAutoSaveStatus("pending");
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        if (scheduleSavingRef.current) {
+          scheduleNeedsResaveRef.current = true;
+          return;
+        }
+
+        scheduleSavingRef.current = true;
+        setScheduleAutoSaveStatus("saving");
+        try {
+          do {
+            scheduleNeedsResaveRef.current = false;
+            const snapshot = scheduleFormRef.current;
+            if (!snapshot) break;
+
+            const saved = await setScheduleSettings(snapshot);
+            queryClient.setQueryData<ScheduleSettings>(["schedule-settings"], saved);
+
+            if (scheduleFormRef.current === snapshot) {
+              skipScheduleAutoSaveRef.current = true;
+              setScheduleForm(saved);
+            } else if (
+              scheduleFormRef.current &&
+              scheduleFormRef.current.smtpAppPassword === snapshot.smtpAppPassword
+            ) {
+              skipScheduleAutoSaveRef.current = true;
+              setScheduleForm({
+                ...scheduleFormRef.current,
+                smtpAppPassword: saved.smtpAppPassword,
+              });
+            }
+          } while (scheduleNeedsResaveRef.current);
+
+          setScheduleAutoSaveStatus("saved");
+        } catch {
+          setScheduleAutoSaveStatus("error");
+        } finally {
+          scheduleSavingRef.current = false;
+        }
+      })();
+    }, SCHEDULE_AUTOSAVE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [scheduleForm, queryClient]);
+
+  // Tự lưu DeepSeek API key + prompt local.
+  useEffect(() => {
+    if (!deepseekForm) return;
+    if (skipDeepseekAutoSaveRef.current) {
+      skipDeepseekAutoSaveRef.current = false;
+      return;
+    }
+
+    setDeepseekAutoSaveStatus("pending");
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        if (deepseekSavingRef.current) {
+          deepseekNeedsResaveRef.current = true;
+          return;
+        }
+
+        deepseekSavingRef.current = true;
+        setDeepseekAutoSaveStatus("saving");
+        try {
+          do {
+            deepseekNeedsResaveRef.current = false;
+            const snapshot = deepseekFormRef.current;
+            if (!snapshot) break;
+
+            const saved = await setDeepSeekSettings({
+              apiKey: snapshot.apiKey,
+              prompt: snapshot.prompt,
+            });
+            queryClient.setQueryData<DeepSeekSettings>(["deepseek-settings"], saved);
+
+            if (deepseekFormRef.current === snapshot) {
+              skipDeepseekAutoSaveRef.current = true;
+              setDeepseekForm(saved);
+            } else if (
+              deepseekFormRef.current &&
+              deepseekFormRef.current.apiKey === snapshot.apiKey
+            ) {
+              skipDeepseekAutoSaveRef.current = true;
+              setDeepseekForm({
+                ...deepseekFormRef.current,
+                apiKey: saved.apiKey,
+                lastReportDay: saved.lastReportDay,
+                lastReportText: saved.lastReportText,
+              });
+            }
+          } while (deepseekNeedsResaveRef.current);
+
+          setDeepseekAutoSaveStatus("saved");
+        } catch {
+          setDeepseekAutoSaveStatus("error");
+        } finally {
+          deepseekSavingRef.current = false;
+        }
+      })();
+    }, SCHEDULE_AUTOSAVE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [deepseekForm, queryClient]);
 
   async function handleRefresh() {
     setIsRefreshing(true);
@@ -139,15 +306,17 @@ export function SettingsPanel() {
   async function handleSaveSchedule() {
     if (!scheduleForm) return;
     setIsSavingSchedule(true);
+    setScheduleAutoSaveStatus("saving");
     setMessageKind("info");
     setMessage("Đang lưu cấu hình báo cáo tự động...");
     try {
       const saved = await setScheduleSettings(scheduleForm);
-      setScheduleForm(saved);
-      await scheduleQuery.refetch();
+      applyServerSchedule(saved);
+      setScheduleAutoSaveStatus("saved");
       setMessageKind("success");
       setMessage("Đã lưu cấu hình báo cáo tự động.");
     } catch (error) {
+      setScheduleAutoSaveStatus("error");
       setMessageKind("error");
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -161,8 +330,7 @@ export function SettingsPanel() {
     setMessage("Đang sync dữ liệu và gửi mail báo cáo...");
     try {
       const updated = await runDailyReportNow();
-      setScheduleForm(updated);
-      await scheduleQuery.refetch();
+      applyServerSchedule(updated);
       await queryClient.invalidateQueries({ queryKey: ["stats"] });
       await queryClient.invalidateQueries({ queryKey: ["reviews"] });
       setMessageKind(updated.lastRunStatus === "success" ? "success" : "error");
@@ -186,8 +354,8 @@ export function SettingsPanel() {
     setMessage(enabled ? "Đang bật khởi động cùng hệ thống..." : "Đang tắt khởi động cùng hệ thống...");
     try {
       const updated = await setAutostartEnabled(enabled);
-      setScheduleForm(updated);
-      await scheduleQuery.refetch();
+      applyServerSchedule(updated);
+      setScheduleAutoSaveStatus("saved");
       setMessageKind("success");
       setMessage(enabled ? "Đã bật khởi động cùng hệ thống." : "Đã tắt khởi động cùng hệ thống.");
     } catch (error) {
@@ -299,8 +467,21 @@ export function SettingsPanel() {
         <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-medium text-white">2. Báo cáo tự động</h2>
           <p className="mt-2 text-sm text-slate-400">
-            App chạy nền trên Windows / macOS, sync theo giờ cấu hình (Asia/Ho_Chi_Minh) và gửi báo
-            cáo ngày hôm trước qua Gmail SMTP. Cấu hình bên dưới được lưu local trên máy này.
+            App chạy nền trên Windows / macOS, sync theo giờ cấu hình (Asia/Ho_Chi_Minh). Ngày có
+            review (&gt;0): tạo tóm tắt bằng DeepSeek rồi gửi Gmail. Ngày 0 review: gửi mẫu mặc định
+            (không gọi API). Các ô bên dưới{" "}
+            <strong className="font-medium text-slate-300">tự lưu local khi nhập</strong>.
+          </p>
+          <p className="mt-1.5 text-xs text-slate-500">
+            {scheduleAutoSaveStatus === "pending"
+              ? "Đang chờ lưu…"
+              : scheduleAutoSaveStatus === "saving" || isSavingSchedule
+                ? "Đang lưu cấu hình…"
+                : scheduleAutoSaveStatus === "saved"
+                  ? "Đã lưu trên máy này."
+                  : scheduleAutoSaveStatus === "error"
+                    ? "Lưu thất bại — thử bấm Lưu ngay."
+                    : null}
           </p>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -552,7 +733,7 @@ export function SettingsPanel() {
               disabled={isSavingSchedule || isRunningNow}
               className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:opacity-50"
             >
-              Lưu cấu hình
+              {isSavingSchedule ? "Đang lưu..." : "Lưu ngay"}
             </button>
             <button
               type="button"
@@ -563,6 +744,134 @@ export function SettingsPanel() {
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
             >
               {isRunningNow ? "Đang chạy..." : "Chạy thử ngay"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {deepseekForm ? (
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <h2 className="text-lg font-medium text-white">3. DeepSeek</h2>
+          <p className="mt-2 text-sm text-slate-400">
+            API key và prompt dùng để tạo lại báo cáo bằng DeepSeek trên tab Báo cáo. Tự lưu local
+            khi nhập.
+          </p>
+          <p className="mt-1.5 text-xs text-slate-500">
+            {deepseekAutoSaveStatus === "pending"
+              ? "Đang chờ lưu…"
+              : deepseekAutoSaveStatus === "saving"
+                ? "Đang lưu cấu hình DeepSeek…"
+                : deepseekAutoSaveStatus === "saved"
+                  ? "Đã lưu trên máy này."
+                  : deepseekAutoSaveStatus === "error"
+                    ? "Lưu thất bại — kiểm tra lại rồi sửa ô nhập."
+                    : null}
+          </p>
+
+          <div className="mt-5 grid gap-4">
+            <div className="text-sm text-slate-300">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>DeepSeek API key</span>
+                <a
+                  href="https://platform.deepseek.com/api_keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-sky-300 underline decoration-sky-500/40 underline-offset-2 hover:text-sky-200"
+                >
+                  Lấy API key
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+              <div className="relative mt-1.5">
+                <input
+                  type={showDeepseekKey ? "text" : "password"}
+                  value={
+                    deepseekForm.apiKey === "********" ? "" : (deepseekForm.apiKey ?? "")
+                  }
+                  onChange={(event) =>
+                    setDeepseekForm((current) =>
+                      current ? { ...current, apiKey: event.target.value } : current,
+                    )
+                  }
+                  placeholder={
+                    deepseekForm.apiKey === "********"
+                      ? "Đã lưu — nhập lại nếu muốn đổi"
+                      : "sk-..."
+                  }
+                  className="block w-full rounded-xl border border-white/10 bg-slate-950/60 py-2.5 pl-3 pr-11 text-sm text-white outline-none ring-sky-500/30 focus:ring-2"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowDeepseekKey((current) => !current)}
+                  aria-label={showDeepseekKey ? "Ẩn API key" : "Hiện API key"}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-200"
+                >
+                  {showDeepseekKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <label className="block text-sm text-slate-300">
+              <span className="flex flex-wrap items-center justify-between gap-2">
+                <span>Prompt tạo báo cáo</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDeepseekForm((current) =>
+                      current ? { ...current, prompt: DEFAULT_DEEPSEEK_PROMPT } : current,
+                    )
+                  }
+                  className="text-xs text-sky-300 underline decoration-sky-500/40 underline-offset-2 hover:text-sky-200"
+                >
+                  Khôi phục mặc định
+                </button>
+              </span>
+              <textarea
+                value={deepseekForm.prompt}
+                onChange={(event) =>
+                  setDeepseekForm((current) =>
+                    current ? { ...current, prompt: event.target.value } : current,
+                  )
+                }
+                rows={18}
+                placeholder="Hướng dẫn DeepSeek viết báo cáo…"
+                className="mt-1.5 w-full min-w-0 resize-y rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3 text-sm leading-relaxed text-slate-100 outline-none ring-sky-500/30 focus:ring-2"
+                spellCheck={false}
+              />
+              <span className="mt-1.5 block text-xs text-slate-500">
+                Placeholder <code className="text-slate-400">{"{{REPORT}}"}</code> sẽ được thay bằng
+                dữ liệu báo cáo gốc khi bấm “Tạo lại bằng DeepSeek”.
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (!deepseekForm) return;
+                void (async () => {
+                  setDeepseekAutoSaveStatus("saving");
+                  try {
+                    const saved = await setDeepSeekSettings({
+                      apiKey: deepseekForm.apiKey,
+                      prompt: deepseekForm.prompt,
+                    });
+                    applyServerDeepseek(saved);
+                    setDeepseekAutoSaveStatus("saved");
+                    setMessageKind("success");
+                    setMessage("Đã lưu cấu hình DeepSeek.");
+                  } catch (error) {
+                    setDeepseekAutoSaveStatus("error");
+                    setMessageKind("error");
+                    setMessage(error instanceof Error ? error.message : String(error));
+                  }
+                })();
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400"
+            >
+              Lưu ngay
             </button>
           </div>
         </section>

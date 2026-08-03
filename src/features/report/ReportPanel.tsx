@@ -1,20 +1,35 @@
-import { useQuery } from "@tanstack/react-query";
-import { Check, Copy, FileText, Mail, RefreshCw, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { getScheduleSettings, getStats, listReviews, sendReportNow } from "../../lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Copy, FileText, Mail, RefreshCw, Sparkles, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  generateDeepSeekReport,
+  getDeepSeekSettings,
+  getScheduleSettings,
+  getStats,
+  listReviews,
+  saveDeepSeekReportText,
+  sendReportNow,
+} from "../../lib/api";
 import {
   buildDailyReportText,
   buildReportSubject,
+  extractDeepSeekSubject,
   filterReviewsByDay,
   formatDayLabelVn,
   formatDayShortVn,
   resolveDailyBreakdown,
+  stripDeepSeekSubjectLine,
   todayDayKeyVn,
   toPeriodStats,
   yesterdayDayKeyVn,
 } from "../../lib/report";
 import { isTauriRuntime } from "../../lib/runtime";
-import type { DailyPeriodStats, Review } from "../../lib/types";
+import { buildZeroReviewReportBody } from "../../lib/deepseek-prompt";
+import type { DailyPeriodStats, DeepSeekSettings, Review } from "../../lib/types";
+
+const DEEPSEEK_REPORT_AUTOSAVE_MS = 800;
+
+type SendSource = "original" | "deepseek";
 
 async function fetchAllRecentReviews(): Promise<Review[]> {
   const all: Review[] = [];
@@ -38,6 +53,7 @@ async function fetchAllRecentReviews(): Promise<Review[]> {
 
 export function ReportPanel() {
   const isDesktop = isTauriRuntime();
+  const queryClient = useQueryClient();
 
   const {
     data,
@@ -66,6 +82,12 @@ export function ReportPanel() {
     enabled: isDesktop,
   });
 
+  const deepseekQuery = useQuery({
+    queryKey: ["deepseek-settings"],
+    queryFn: getDeepSeekSettings,
+    enabled: isDesktop,
+  });
+
   useEffect(() => {
     void refetchStats();
     void refetchReviews();
@@ -84,11 +106,26 @@ export function ReportPanel() {
   const [selectedDay, setSelectedDay] = useState(defaultDay);
   const [reportSubject, setReportSubject] = useState(() => buildReportSubject(defaultDay));
   const [reportText, setReportText] = useState("");
+  const [deepseekText, setDeepseekText] = useState("");
   const [copied, setCopied] = useState(false);
+  const [deepseekCopied, setDeepseekCopied] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [sendSource, setSendSource] = useState<SendSource>("original");
   const [isSending, setIsSending] = useState(false);
+  const [isGeneratingDeepseek, setIsGeneratingDeepseek] = useState(false);
   const [sendMessage, setSendMessage] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [deepseekMessage, setDeepseekMessage] = useState<string | null>(null);
+  const [deepseekError, setDeepseekError] = useState<string | null>(null);
+  const [deepseekSaveStatus, setDeepseekSaveStatus] = useState<
+    "idle" | "pending" | "saving" | "saved" | "error"
+  >("idle");
+
+  const deepseekTextRef = useRef(deepseekText);
+  const skipDeepseekTextSaveRef = useRef(false);
+  const deepseekTextSavingRef = useRef(false);
+  const deepseekTextNeedsResaveRef = useRef(false);
+  deepseekTextRef.current = deepseekText;
 
   useEffect(() => {
     setSelectedDay(defaultDay);
@@ -115,11 +152,77 @@ export function ReportPanel() {
     );
   }, [selectedStats, allReviews]);
 
+  // Nạp báo cáo DeepSeek đã lưu local (theo ngày).
+  // Ngày 0 review → mẫu mail mặc định (không cần API).
+  useEffect(() => {
+    if (!selectedStats) return;
+    const settings = deepseekQuery.data;
+    const hasZeroReviews = (selectedStats.reviewCount ?? 0) === 0;
+    const savedForDay =
+      settings?.lastReportDay === selectedStats.day &&
+      settings.lastReportText &&
+      settings.lastReportText.trim()
+        ? settings.lastReportText
+        : null;
+
+    skipDeepseekTextSaveRef.current = true;
+    if (savedForDay) {
+      setDeepseekText(savedForDay);
+    } else if (hasZeroReviews) {
+      setDeepseekText(buildZeroReviewReportBody(selectedStats.day));
+    } else {
+      setDeepseekText("");
+    }
+  }, [deepseekQuery.data, selectedStats?.day, selectedStats?.reviewCount]);
+
+  // Tự lưu nội dung DeepSeek khi user sửa.
+  useEffect(() => {
+    if (!isDesktop || !selectedStats) return;
+    if (skipDeepseekTextSaveRef.current) {
+      skipDeepseekTextSaveRef.current = false;
+      return;
+    }
+    if (!deepseekText.trim()) return;
+
+    setDeepseekSaveStatus("pending");
+    const day = selectedStats.day;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        if (deepseekTextSavingRef.current) {
+          deepseekTextNeedsResaveRef.current = true;
+          return;
+        }
+        deepseekTextSavingRef.current = true;
+        setDeepseekSaveStatus("saving");
+        try {
+          do {
+            deepseekTextNeedsResaveRef.current = false;
+            const snapshot = deepseekTextRef.current;
+            const saved = await saveDeepSeekReportText(day, snapshot);
+            queryClient.setQueryData<DeepSeekSettings>(["deepseek-settings"], saved);
+          } while (deepseekTextNeedsResaveRef.current);
+          setDeepseekSaveStatus("saved");
+        } catch {
+          setDeepseekSaveStatus("error");
+        } finally {
+          deepseekTextSavingRef.current = false;
+        }
+      })();
+    }, DEEPSEEK_REPORT_AUTOSAVE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [deepseekText, selectedStats?.day, isDesktop, queryClient]);
+
   const isFetching = statsFetching || reviewsFetching;
   const recipient = scheduleQuery.data?.recipient?.trim() || "";
   const cc = scheduleQuery.data?.cc?.trim() || "";
   const bcc = scheduleQuery.data?.bcc?.trim() || "";
   const smtpEmail = scheduleQuery.data?.smtpEmail?.trim() || "";
+  const hasDeepseekKey = Boolean(
+    deepseekQuery.data?.apiKey && deepseekQuery.data.apiKey.trim(),
+  );
 
   async function handleRefresh() {
     await Promise.all([refetchStats(), refetchReviews()]);
@@ -135,46 +238,156 @@ export function ReportPanel() {
     }
   }
 
-  function handleRequestSendNow() {
+  async function handleCopyDeepseek() {
+    try {
+      await navigator.clipboard.writeText(deepseekText);
+      setDeepseekCopied(true);
+      window.setTimeout(() => setDeepseekCopied(false), 2000);
+    } catch {
+      setDeepseekCopied(false);
+    }
+  }
+
+  async function handleGenerateDeepseek() {
+    if (!selectedStats) return;
+    setDeepseekError(null);
+    setDeepseekMessage(null);
+    if (!isDesktop) {
+      setDeepseekError("DeepSeek chỉ khả dụng trên app desktop (Windows / macOS).");
+      return;
+    }
+
+    const hasZeroReviews =
+      (selectedStats.reviewCount ?? 0) === 0 || dayReviews.length === 0;
+
+    // 0 review → mẫu cố định, không gọi API.
+    if (hasZeroReviews) {
+      const template = buildZeroReviewReportBody(selectedStats.day);
+      setIsGeneratingDeepseek(true);
+      try {
+        skipDeepseekTextSaveRef.current = true;
+        setDeepseekText(template);
+        const saved = await saveDeepSeekReportText(selectedStats.day, template);
+        queryClient.setQueryData<DeepSeekSettings>(["deepseek-settings"], saved);
+        setDeepseekSaveStatus("saved");
+        setDeepseekMessage(
+          "Ngày không có đánh giá — đã dùng mẫu mail mặc định (không gọi DeepSeek).",
+        );
+      } catch (error) {
+        setDeepseekError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setIsGeneratingDeepseek(false);
+      }
+      return;
+    }
+
+    if (!hasDeepseekKey) {
+      setDeepseekError("Chưa cấu hình DeepSeek API key. Vào Cài đặt → DeepSeek để nhập.");
+      return;
+    }
+    if (!reportText.trim()) {
+      setDeepseekError("Chưa có nội dung báo cáo gốc để gửi lên DeepSeek.");
+      return;
+    }
+
+    setIsGeneratingDeepseek(true);
+    try {
+      const result = await generateDeepSeekReport(selectedStats.day, reportText);
+      skipDeepseekTextSaveRef.current = true;
+      setDeepseekText(result.text);
+      queryClient.setQueryData<DeepSeekSettings>(["deepseek-settings"], result.settings);
+      setDeepseekSaveStatus("saved");
+      setDeepseekMessage("Đã tạo báo cáo bằng DeepSeek và lưu local.");
+    } catch (error) {
+      setDeepseekError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsGeneratingDeepseek(false);
+    }
+  }
+
+  function handleRequestSendNow(source: SendSource = "original") {
     setSendMessage(null);
     setSendError(null);
+    setDeepseekMessage(null);
+    setDeepseekError(null);
     if (!isDesktop) {
-      setSendError("Gửi ngay chỉ khả dụng trên app desktop (Windows / macOS).");
+      const msg = "Gửi ngay chỉ khả dụng trên app desktop (Windows / macOS).";
+      if (source === "deepseek") setDeepseekError(msg);
+      else setSendError(msg);
       return;
     }
     if (!recipient) {
-      setSendError("Chưa cấu hình email nhận báo cáo. Vào Cài đặt để điền.");
+      const msg = "Chưa cấu hình email nhận báo cáo. Vào Cài đặt để điền.";
+      if (source === "deepseek") setDeepseekError(msg);
+      else setSendError(msg);
       return;
     }
     if (!smtpEmail) {
-      setSendError("Chưa cấu hình Gmail gửi. Vào Cài đặt để điền.");
+      const msg = "Chưa cấu hình Gmail gửi. Vào Cài đặt để điền.";
+      if (source === "deepseek") setDeepseekError(msg);
+      else setSendError(msg);
       return;
     }
+    if (source === "deepseek" && !deepseekText.trim()) {
+      setDeepseekError("Chưa có nội dung DeepSeek để gửi. Hãy tạo báo cáo trước.");
+      return;
+    }
+    if (source === "original" && !reportSubject.trim()) {
+      setSendError("Tiêu đề không được để trống.");
+      return;
+    }
+    setSendSource(source);
     setConfirmOpen(true);
   }
 
   async function handleConfirmSendNow() {
-    if (!selectedStats || !sendReportNow) return;
-    if (!reportSubject.trim()) {
-      setSendError("Tiêu đề không được để trống.");
+    if (!selectedStats) return;
+
+    const subject =
+      sendSource === "deepseek"
+        ? extractDeepSeekSubject(deepseekText, selectedStats.day)
+        : reportSubject.trim();
+    const body =
+      sendSource === "deepseek" ? stripDeepSeekSubjectLine(deepseekText) : undefined;
+
+    if (!subject) {
+      const msg = "Tiêu đề không được để trống.";
+      if (sendSource === "deepseek") setDeepseekError(msg);
+      else setSendError(msg);
       setConfirmOpen(false);
       return;
     }
+    if (sendSource === "deepseek" && !body) {
+      setDeepseekError("Chưa có nội dung DeepSeek để gửi.");
+      setConfirmOpen(false);
+      return;
+    }
+
     setIsSending(true);
     setSendError(null);
     setSendMessage(null);
+    setDeepseekError(null);
+    setDeepseekMessage(null);
     try {
-      const result = await sendReportNow(selectedStats.day, reportSubject);
+      const result = await sendReportNow(
+        selectedStats.day,
+        subject,
+        sendSource === "deepseek" ? body : null,
+      );
       setConfirmOpen(false);
+      const okMsg = `Đã gửi báo cáo${sendSource === "deepseek" ? " DeepSeek" : ""} ngày ${formatDayShortVn(selectedStats.day)} tới ${recipient}.`;
       if (result.lastRunStatus === "success") {
-        setSendMessage(
-          `Đã gửi báo cáo ngày ${formatDayShortVn(selectedStats.day)} tới ${recipient}.`,
-        );
+        if (sendSource === "deepseek") setDeepseekMessage(okMsg);
+        else setSendMessage(okMsg);
       } else {
-        setSendError(result.lastRunError ?? "Gửi mail thất bại.");
+        const err = result.lastRunError ?? "Gửi mail thất bại.";
+        if (sendSource === "deepseek") setDeepseekError(err);
+        else setSendError(err);
       }
     } catch (error) {
-      setSendError(error instanceof Error ? error.message : String(error));
+      const err = error instanceof Error ? error.message : String(error);
+      if (sendSource === "deepseek") setDeepseekError(err);
+      else setSendError(err);
       setConfirmOpen(false);
     } finally {
       setIsSending(false);
@@ -233,8 +446,9 @@ export function ReportPanel() {
               Báo cáo theo ngày
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Chọn ngày trong 7 ngày gần nhất (giờ VN). Nút <strong className="text-slate-200">Gửi ngay</strong>{" "}
-              gửi mail qua SMTP ngay, không chờ lịch hẹn.
+              Chọn ngày trong 7 ngày gần nhất (giờ VN). Nút{" "}
+              <strong className="text-slate-200">Gửi ngay</strong> gửi mail qua SMTP ngay, không chờ
+              lịch hẹn.
             </p>
           </div>
           <button
@@ -309,7 +523,7 @@ export function ReportPanel() {
             </button>
             <button
               type="button"
-              onClick={handleRequestSendNow}
+              onClick={() => handleRequestSendNow("original")}
               disabled={isSending}
               className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-3 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:opacity-50"
             >
@@ -345,6 +559,99 @@ export function ReportPanel() {
         </p>
       </section>
 
+      <section className="rounded-2xl border border-violet-500/20 bg-white/5 p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-medium text-white">
+              <Sparkles size={18} className="text-violet-300" />
+              Báo cáo DeepSeek
+            </h3>
+            <p className="mt-1 text-sm text-slate-400">
+              Ngày có review: tóm tắt bằng DeepSeek. Ngày 0 review: dùng mẫu mail mặc định (không
+              gọi API).
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void handleCopyDeepseek();
+              }}
+              disabled={!deepseekText.trim()}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
+            >
+              {deepseekCopied ? <Check size={14} /> : <Copy size={14} />}
+              {deepseekCopied ? "Đã sao chép" : "Sao chép"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleGenerateDeepseek();
+              }}
+              disabled={isGeneratingDeepseek || isSending}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-sm font-medium text-white hover:bg-violet-400 disabled:opacity-50"
+            >
+              {isGeneratingDeepseek ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Sparkles size={14} />
+              )}
+              {isGeneratingDeepseek ? "Đang tạo..." : "Tạo lại bằng DeepSeek"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRequestSendNow("deepseek")}
+              disabled={isSending || isGeneratingDeepseek || !deepseekText.trim()}
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-3 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:opacity-50"
+            >
+              <Mail size={14} />
+              Gửi ngay
+            </button>
+          </div>
+        </div>
+
+        {deepseekMessage ? (
+          <div className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+            {deepseekMessage}
+          </div>
+        ) : null}
+        {deepseekError ? (
+          <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+            {deepseekError}
+          </div>
+        ) : null}
+
+        <label className="block text-sm text-slate-300">
+          Nội dung DeepSeek
+          <textarea
+            value={deepseekText}
+            onChange={(event) => setDeepseekText(event.target.value)}
+            rows={14}
+            placeholder={
+              (selectedStats.reviewCount ?? 0) === 0
+                ? "Ngày không có review — đang dùng mẫu mail mặc định."
+                : hasDeepseekKey
+                  ? "Bấm “Tạo lại bằng DeepSeek” để sinh báo cáo…"
+                  : "Chưa có API key — vào Cài đặt → DeepSeek để cấu hình."
+            }
+            className="mt-1.5 w-full min-w-0 resize-y rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3 font-mono text-sm leading-relaxed text-slate-100 outline-none ring-sky-500/30 focus:ring-2"
+            spellCheck={false}
+          />
+        </label>
+        <p className="mt-2 text-xs text-slate-500">
+          {deepseekSaveStatus === "pending"
+            ? "Đang chờ lưu…"
+            : deepseekSaveStatus === "saving"
+              ? "Đang lưu local…"
+              : deepseekSaveStatus === "saved"
+                ? "Đã lưu nội dung DeepSeek trên máy này."
+                : deepseekSaveStatus === "error"
+                  ? "Lưu thất bại."
+                  : "Sửa tay cũng được — app tự lưu local."}{" "}
+          <strong className="text-slate-300">Gửi ngay</strong> gửi đúng nội dung khung này qua SMTP.
+        </p>
+      </section>
+
       {confirmOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0f19]/80 px-4 backdrop-blur-sm">
           <div
@@ -356,10 +663,18 @@ export function ReportPanel() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 id="send-now-title" className="text-lg font-medium text-white">
-                  Xác nhận gửi ngay?
+                  {sendSource === "deepseek"
+                    ? "Xác nhận gửi báo cáo DeepSeek?"
+                    : "Xác nhận gửi ngay?"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-400">
-                  Gửi báo cáo ngày{" "}
+                  Gửi{" "}
+                  {sendSource === "deepseek" ? (
+                    <span className="font-medium text-violet-200">nội dung DeepSeek</span>
+                  ) : (
+                    "báo cáo"
+                  )}{" "}
+                  ngày{" "}
                   <span className="font-medium text-slate-200">
                     {formatDayLabelVn(selectedStats.day)}
                   </span>{" "}
@@ -378,6 +693,10 @@ export function ReportPanel() {
             </div>
 
             <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
+              <p>
+                <span className="text-slate-400">Nguồn:</span>{" "}
+                {sendSource === "deepseek" ? "Báo cáo DeepSeek" : "Nội dung gửi"}
+              </p>
               <p>
                 <span className="text-slate-400">Từ:</span> {smtpEmail || "—"}
               </p>
@@ -398,7 +717,10 @@ export function ReportPanel() {
                 <span className="text-slate-400">Ngày:</span> {formatDayShortVn(selectedStats.day)}
               </p>
               <p className="break-words">
-                <span className="text-slate-400">Tiêu đề:</span> {reportSubject.trim() || "—"}
+                <span className="text-slate-400">Tiêu đề:</span>{" "}
+                {sendSource === "deepseek"
+                  ? extractDeepSeekSubject(deepseekText, selectedStats.day)
+                  : reportSubject.trim() || "—"}
               </p>
             </div>
 

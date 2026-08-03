@@ -126,4 +126,17 @@ export interface ScheduleSettings {
   envOverrides?: string[];
 }
 
+export interface DeepSeekSettings {
+  apiKey?: string | null;
+  prompt: string;
+  lastReportDay?: string | null;
+  lastReportText?: string | null;
+}
+
+export interface DeepSeekGenerateResult {
+  day: string;
+  text: string;
+  settings: DeepSeekSettings;
+}
+
 export type TabId = "dashboard" | "reviews" | "report" | "settings";

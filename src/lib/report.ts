@@ -1,3 +1,4 @@
+import { DEFAULT_DEEPSEEK_EMAIL_SUBJECT } from "./deepseek-prompt";
 import type { DailyPeriodStats, PeriodStats, Review, StatsOverview } from "./types";
 import { dayKeyVn, formatDate, formatNumber, formatPercent, formatRating } from "./utils";
 
@@ -198,6 +199,19 @@ export function buildDailyReportText(
 
 export function buildReportSubject(dayKey: string): string {
   return `Báo cáo MyTV Reviews — ${formatDayShortVn(dayKey)}`;
+}
+
+/** Subject khi gửi mail DeepSeek — mặc định cố định, không lấy từ nội dung. */
+export function extractDeepSeekSubject(text: string, _dayKey?: string): string {
+  const match = text.match(/^\s*(?:Subject|Tiêu đề):\s*(.+)\s*$/im);
+  const fromText = match?.[1]?.trim();
+  if (fromText) return fromText;
+  return DEFAULT_DEEPSEEK_EMAIL_SUBJECT;
+}
+
+/** Bỏ dòng Subject/Tiêu đề khỏi body khi gửi mail (Subject đã tách riêng). */
+export function stripDeepSeekSubjectLine(text: string): string {
+  return text.replace(/^\s*(?:Subject|Tiêu đề):\s*.+\s*\n+/im, "").trimStart();
 }
 
 /** Mở Gmail compose với sẵn subject + body (user có thể chỉnh trước khi gửi). */

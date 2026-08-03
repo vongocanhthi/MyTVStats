@@ -1,6 +1,10 @@
 use crate::env_config;
 use crate::error::AppResult;
-use crate::models::{ReportDayTarget, ScheduleRunStatus, ScheduleSettings};
+use crate::models::{
+    DeepSeekSettings, ReportDayTarget, ScheduleRunStatus, ScheduleSettings,
+    DEFAULT_DEEPSEEK_PROMPT, LEGACY_DEFAULT_DEEPSEEK_PROMPT_V1, LEGACY_DEFAULT_DEEPSEEK_PROMPT_V2,
+    LEGACY_DEFAULT_DEEPSEEK_PROMPT_V3,
+};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -16,6 +20,8 @@ struct StoredSettings {
     custom_service_account_path: Option<String>,
     #[serde(default)]
     schedule: Option<StoredScheduleSettings>,
+    #[serde(default)]
+    deepseek: Option<StoredDeepSeekSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +45,59 @@ struct StoredScheduleSettings {
     last_run_at: Option<i64>,
     last_run_status: Option<ScheduleRunStatus>,
     last_run_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredDeepSeekSettings {
+    api_key: Option<String>,
+    #[serde(default = "default_deepseek_prompt")]
+    prompt: String,
+    #[serde(default)]
+    last_report_day: Option<String>,
+    #[serde(default)]
+    last_report_text: Option<String>,
+}
+
+fn default_deepseek_prompt() -> String {
+    DEFAULT_DEEPSEEK_PROMPT.to_string()
+}
+
+impl Default for StoredDeepSeekSettings {
+    fn default() -> Self {
+        Self {
+            api_key: None,
+            prompt: default_deepseek_prompt(),
+            last_report_day: None,
+            last_report_text: None,
+        }
+    }
+}
+
+impl From<StoredDeepSeekSettings> for DeepSeekSettings {
+    fn from(value: StoredDeepSeekSettings) -> Self {
+        Self {
+            api_key: value.api_key,
+            prompt: if value.prompt.trim().is_empty() {
+                default_deepseek_prompt()
+            } else {
+                value.prompt
+            },
+            last_report_day: value.last_report_day,
+            last_report_text: value.last_report_text,
+        }
+    }
+}
+
+impl From<&DeepSeekSettings> for StoredDeepSeekSettings {
+    fn from(value: &DeepSeekSettings) -> Self {
+        Self {
+            api_key: value.api_key.clone(),
+            prompt: value.prompt.clone(),
+            last_report_day: value.last_report_day.clone(),
+            last_report_text: value.last_report_text.clone(),
+        }
+    }
 }
 
 impl Default for StoredScheduleSettings {
@@ -352,6 +411,89 @@ pub fn save_schedule_settings(
     payload.schedule = Some(to_store);
     save_settings(app, &payload)?;
     load_schedule_settings(app)
+}
+
+pub fn load_deepseek_settings(app: &AppHandle) -> AppResult<DeepSeekSettings> {
+    let parsed = load_settings(app)?;
+    let mut settings: DeepSeekSettings = parsed.deepseek.unwrap_or_default().into();
+
+    // Máy đã lưu prompt mặc định cũ → nâng lên bản mới và ghi local.
+    if is_legacy_default_prompt(&settings.prompt) {
+        settings.prompt = default_deepseek_prompt();
+        let mut payload = load_settings(app)?;
+        let mut stored = payload.deepseek.unwrap_or_default();
+        stored.prompt = settings.prompt.clone();
+        payload.deepseek = Some(stored);
+        save_settings(app, &payload)?;
+    }
+
+    Ok(settings)
+}
+
+fn is_legacy_default_prompt(prompt: &str) -> bool {
+    let normalized = normalize_prompt(prompt);
+    normalized == normalize_prompt(LEGACY_DEFAULT_DEEPSEEK_PROMPT_V1)
+        || normalized == normalize_prompt(LEGACY_DEFAULT_DEEPSEEK_PROMPT_V2)
+        || normalized == normalize_prompt(LEGACY_DEFAULT_DEEPSEEK_PROMPT_V3)
+}
+
+fn normalize_prompt(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+pub fn save_deepseek_settings(
+    app: &AppHandle,
+    mut settings: DeepSeekSettings,
+) -> AppResult<DeepSeekSettings> {
+    let mut payload = load_settings(app)?;
+    let previous = payload.deepseek.clone().unwrap_or_default();
+
+    if let Some(raw) = settings.api_key.take() {
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() || trimmed == "********" {
+            settings.api_key = None;
+        } else {
+            settings.api_key = Some(trimmed);
+        }
+    }
+
+    if settings
+        .api_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none()
+    {
+        settings.api_key = previous.api_key.clone();
+    }
+
+    if settings.prompt.trim().is_empty() {
+        settings.prompt = previous.prompt.clone();
+        if settings.prompt.trim().is_empty() {
+            settings.prompt = default_deepseek_prompt();
+        }
+    }
+
+    // Giữ báo cáo AI đã lưu nếu UI không gửi kèm.
+    if settings.last_report_text.is_none() {
+        settings.last_report_day = previous.last_report_day.clone();
+        settings.last_report_text = previous.last_report_text.clone();
+    }
+
+    payload.deepseek = Some(StoredDeepSeekSettings::from(&settings));
+    save_settings(app, &payload)?;
+    load_deepseek_settings(app)
+}
+
+pub fn save_deepseek_report(
+    app: &AppHandle,
+    day: &str,
+    text: &str,
+) -> AppResult<DeepSeekSettings> {
+    let mut settings = load_deepseek_settings(app)?;
+    settings.last_report_day = Some(day.to_string());
+    settings.last_report_text = Some(text.to_string());
+    save_deepseek_settings(app, settings)
 }
 
 fn load_settings(app: &AppHandle) -> AppResult<StoredSettings> {

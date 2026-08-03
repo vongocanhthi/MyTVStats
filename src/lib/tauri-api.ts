@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppSettings,
+  DeepSeekGenerateResult,
+  DeepSeekSettings,
   ReviewFilters,
   ReviewsPage,
   ScheduleSettings,
@@ -63,13 +65,40 @@ export function runDailyReportNow(): Promise<ScheduleSettings> {
   return invoke<ScheduleSettings>("run_daily_report_now");
 }
 
-export function sendReportNow(day: string, subject?: string | null): Promise<ScheduleSettings> {
+export function sendReportNow(
+  day: string,
+  subject?: string | null,
+  body?: string | null,
+): Promise<ScheduleSettings> {
   return invoke<ScheduleSettings>("send_report_now", {
     day,
     subject: subject?.trim() ? subject.trim() : null,
+    body: body?.trim() ? body.trim() : null,
   });
 }
 
 export function setAutostartEnabled(enabled: boolean): Promise<ScheduleSettings> {
   return invoke<ScheduleSettings>("set_autostart_enabled", { enabled });
+}
+
+export function getDeepSeekSettings(): Promise<DeepSeekSettings> {
+  return invoke<DeepSeekSettings>("get_deepseek_settings");
+}
+
+export function setDeepSeekSettings(settings: DeepSeekSettings): Promise<DeepSeekSettings> {
+  return invoke<DeepSeekSettings>("set_deepseek_settings", { settings });
+}
+
+export function generateDeepSeekReport(
+  day: string,
+  sourceReport: string,
+): Promise<DeepSeekGenerateResult> {
+  return invoke<DeepSeekGenerateResult>("generate_deepseek_report", {
+    day,
+    sourceReport,
+  });
+}
+
+export function saveDeepSeekReportText(day: string, text: string): Promise<DeepSeekSettings> {
+  return invoke<DeepSeekSettings>("save_deepseek_report_text", { day, text });
 }

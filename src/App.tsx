@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
 import { Layout } from "./components/Layout";
 import { LoginDialog } from "./features/auth/LoginDialog";
 import { Dashboard } from "./features/dashboard/Dashboard";
@@ -22,6 +23,32 @@ const queryClient = new QueryClient({
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const [authed, setAuthed] = useState(() => isTauriRuntime() || isAuthenticated());
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void listen<string>("navigate-tab", (event) => {
+      const tab = event.payload;
+      if (
+        tab === "dashboard" ||
+        tab === "reviews" ||
+        tab === "report" ||
+        tab === "settings"
+      ) {
+        setActiveTab(tab);
+      }
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   if (!authed) {
     return <LoginDialog onSuccess={() => setAuthed(true)} />;

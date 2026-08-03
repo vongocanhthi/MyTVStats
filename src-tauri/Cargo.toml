@@ -1,6 +1,6 @@
 [package]
 name = "mytvstats"
-version = "0.1.0"
+version = "0.2.0"
 description = "MyTV Google Play review statistics dashboard"
 authors = ["VNPT Media"]
 edition = "2021"
