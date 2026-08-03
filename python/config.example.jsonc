@@ -1,0 +1,30 @@
+{
+  "package_name": "vn.mytvnet.mobileb2c",                          // package trên Google Play
+  "service_account_path": "credentials/service_account.json",      // Copy file JSON từ Google Cloud/Play Console vào python/credentials/ và đặt tên service_account.json (hoặc đổi path cho khớp tên file)
+  "report_day_target": "yesterday",                                // "yesterday" | "today" (giờ VN)
+
+  "schedule": {
+    "enabled": true,                                               // false = tắt lịch tự động
+    "hour": 9,                                                     // giờ gửi (0–23), mặc định 9
+    "minute": 0,                                                   // phút (0–59), mặc định 0 → 09:00
+    "timezone": "Asia/Ho_Chi_Minh"                                 // múi giờ lịch
+  },
+
+  "autostart": {
+    "enabled": true                                                // mặc định bật; false = tắt; sau khi sửa chạy: python main.py sync-autostart
+  },
+
+  "gmail": {
+    "from": "your.name@gmail.com",                                 // CHỈ 1 Gmail (tài khoản App Password)
+    "app_password": "xxxx xxxx xxxx xxxx",                         // App Password 16 ký tự
+    "to": "lead@example.com, team@vnpt.vn",                        // người nhận — mọi domain OK (gmail, vnpt.vn, …); nhiều mail cách nhau bởi , hoặc ;
+    "cc": "manager@example.com, qa@example.com",                   // để "" nếu không dùng
+    "bcc": "archive@example.com"                                   // nhận ẩn; để "" nếu không dùng
+  },
+
+  "deepseek": {
+    "api_key": "sk-...",                                           // key từ platform.deepseek.com
+    "model": "deepseek-v4-flash",                                  // mặc định giống app; đổi: "deepseek-v4-pro" (mạnh hơn, đắt hơn). Legacy "deepseek-chat"/"deepseek-reasoner" đã retire
+    "prompt": ""                                                   // KHÔNG cần điền — "" = mặc định giống app; chỉ điền nếu muốn ghi đè
+  }
+}

@@ -51,3 +51,10 @@ npm run tauri build
 npm run tauri dev    # Desktop (dev)
 npm run tauri build  # Desktop (installer)
 ```
+
+## Python CLI (độc lập)
+
+Headless script (Win/macOS/Linux) trong [`python/`](./python/) — không ảnh hưởng app UI.
+
+- Hướng dẫn user: [`python/README.md`](./python/README.md)
+- Đóng gói zip phát hành: `cd python && python3 pack_release.py` → `dist/MyTVStats-python-*.zip`

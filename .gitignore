@@ -32,6 +32,13 @@ credentials/service_account.json
 /data-smoke/
 .vercel
 .env*
+python/config.json
+python/.venv/
+python/credentials/service_account.json
+python/out/
+python/logs/
+python/data/
+python/dist/
 
 # Local release artifacts
 release/
