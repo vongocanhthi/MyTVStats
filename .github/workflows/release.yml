@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (ví dụ v0.1.0)"
+        description: "Release tag (ví dụ v0.2.0)"
         required: true
-        default: "v0.1.0"
+        default: "v0.2.0"
 
 permissions:
   contents: write
@@ -26,6 +26,9 @@ jobs:
           - platform: macos-14
             args: "--target x86_64-apple-darwin"
             rust_targets: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+            rust_targets: ""
           - platform: windows-latest
             args: ""
             rust_targets: ""
@@ -47,6 +50,17 @@ jobs:
         with:
           targets: ${{ matrix.rust_targets }}
 
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
       - name: Install frontend dependencies
         run: npm ci
 
@@ -58,14 +72,15 @@ jobs:
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseName: MyTV Stats ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseBody: |
-            Bản phát hành đầu tiên của MyTV Stats (desktop).
+            Bản phát hành MyTV Stats (desktop).
 
             ## Cài đặt
             - **macOS Apple Silicon (M1/M2/M3/M4):** `*_aarch64.dmg`
             - **macOS Intel:** `*_x64.dmg`
             - **Windows:** `*.msi` hoặc `*-setup.exe` (NSIS)
+            - **Linux:** `*.AppImage` hoặc `*.deb`
 
-            Sau khi mở app, vào **Settings** để upload Service Account JSON và cấu hình Gmail.
-          releaseDraft: true
+            Sau khi mở app, vào **Cài đặt** để upload Service Account JSON, cấu hình Gmail và DeepSeek.
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
